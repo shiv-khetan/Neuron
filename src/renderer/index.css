@@ -135,6 +135,15 @@ body.window-maximized .window-control {
   margin-top: 8px;
 }
 .status-bar { height: 24px; background: var(--nav); border-top: 1px solid var(--divider); }
+
+/* Resizable dock dividers (react-resizable-panels) */
+.resize-handle { position: relative; background: var(--divider); transition: background-color 160ms var(--ease-out); }
+.resize-handle:hover, .resize-handle[data-resize-handle-active] { background: var(--accent); }
+.resize-handle-v { width: 1px; cursor: col-resize; }
+.resize-handle-h { height: 1px; cursor: row-resize; }
+/* Widen the hit target without shifting layout */
+.resize-handle-v::after { content: ""; position: absolute; inset: 0 -3px; }
+.resize-handle-h::after { content: ""; position: absolute; inset: -3px 0; }
 .textarea-reset { font: inherit; }
 .nav-surface { background: var(--nav); border-color: var(--divider); }
 .work-surface { background: var(--surface); border-color: var(--divider); }
@@ -422,4 +431,90 @@ html[data-theme='light'] .neuron-logo {
   filter: none;
 }
 
+@layer base {
+  :root {
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+  .dark {
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
 
+
+
+/* Default typography for .vw views so raw HTML looks styled out of the box. */
+.vw-content > * + * { margin-top: 1rem; }
+.vw-content h1 { font-size: 1.5rem; font-weight: 600; color: var(--ink); }
+.vw-content h2 { font-size: 1.25rem; font-weight: 600; color: var(--ink); margin-top: 1.5rem; }
+.vw-content h3 { font-size: 1.05rem; font-weight: 600; color: var(--ink); margin-top: 1.25rem; }
+.vw-content p { font-size: 0.9rem; line-height: 1.6; color: var(--ink-secondary); }
+.vw-content a { color: var(--accent-strong); text-decoration: underline; }
+.vw-content ul { list-style: disc; padding-left: 1.25rem; color: var(--ink-secondary); }
+.vw-content ol { list-style: decimal; padding-left: 1.25rem; color: var(--ink-secondary); }
+.vw-content li { margin-top: 0.25rem; }
+.vw-content code { font-family: var(--font-mono, monospace); font-size: 0.85em; background: var(--surface); padding: 0.1rem 0.3rem; border-radius: 4px; }
+.vw-content pre { background: var(--surface); padding: 0.75rem 1rem; border-radius: 8px; overflow-x: auto; border: 1px solid var(--divider); }
+.vw-content pre code { background: none; padding: 0; }
+.vw-content hr { border: none; border-top: 1px solid var(--divider); }
+
+/* Block label (database / section titles). */
+.vw-content .vw-label { font-size: 0.75rem; font-weight: 600; color: var(--ink-muted); }
+
+/* Read-only file table inside a tile. */
+.vw-content .vw-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.vw-content .vw-table th { text-align: left; font-weight: 500; color: var(--ink-muted); padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--divider); }
+.vw-content .vw-table td { padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--divider); color: var(--ink-secondary); }
+.vw-content .vw-table tr:last-child td { border-bottom: none; }
+.vw-content .vw-chip { display: inline-block; font-family: var(--font-mono, monospace); font-size: 0.7rem; padding: 0.05rem 0.4rem; border-radius: 4px; background: var(--surface-hover); color: var(--ink-secondary); }
+
+/* Editable Notion-style database. Borderless; thin row dividers; hover rows. */
+.vw-content .vw-db { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.vw-content .vw-db thead tr { border-bottom: 1px solid var(--divider); }
+.vw-content .vw-db th { padding: 0.3rem 0.25rem; vertical-align: middle; }
+.vw-content .vw-db tbody tr { border-bottom: 1px solid var(--divider); transition: background-color 0.12s ease-out; }
+.vw-content .vw-db tbody tr:hover { background: var(--surface-hover); }
+.vw-content .vw-db td { padding: 0.1rem 0.25rem; vertical-align: middle; }
+.vw-content .vw-db-gutter { width: 1.75rem; text-align: center; }
+
+/* In-cell editors: chrome-free until focused, then a soft ring. */
+.vw-content .vw-cell { width: 100%; background: transparent; border: none; outline: none; color: var(--ink); font: inherit; padding: 0.3rem 0.4rem; border-radius: 5px; }
+.vw-content .vw-cell::placeholder { color: var(--ink-muted); }
+.vw-content .vw-cell:focus { background: var(--canvas); box-shadow: 0 0 0 1.5px var(--accent); }
+
+.vw-content .vw-icon-btn { display: inline-grid; place-items: center; height: 1.25rem; width: 1.25rem; border-radius: 4px; color: var(--ink-muted); transition: background-color 0.12s ease-out, color 0.12s ease-out, opacity 0.12s ease-out; }
+.vw-content .vw-icon-btn:hover { background: var(--surface-hover); color: var(--ink); }
+
+.vw-content .vw-newrow { display: flex; align-items: center; gap: 0.35rem; width: 100%; padding: 0.4rem 0.5rem; margin-top: 0.15rem; font-size: 0.8rem; color: var(--ink-muted); border-radius: 5px; transition: background-color 0.12s ease-out, color 0.12s ease-out; }
+.vw-content .vw-newrow:hover { background: var(--surface-hover); color: var(--ink); }
+
+/* Progress bar (habit / driver completion). */
+.vw-content .vw-progress-track { height: 0.5rem; border-radius: 999px; background: var(--surface-hover); overflow: hidden; }
+.vw-content .vw-progress-fill { height: 100%; border-radius: 999px; background: var(--accent); transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* Habit heatmap (GitHub-style contribution grid). */
+.vw-content .vw-heatmap { display: flex; gap: 3px; overflow-x: auto; padding-top: 0.25rem; }
+.vw-content .vw-heatmap-col { display: flex; flex-direction: column; gap: 3px; }
+.vw-content .vw-heatmap-cell { width: 13px; height: 13px; border-radius: 3px; background: var(--surface-hover); }
+.vw-content .vw-heatmap-cell[data-level="1"] { background: color-mix(in oklch, var(--accent) 28%, var(--surface)); }
+.vw-content .vw-heatmap-cell[data-level="2"] { background: color-mix(in oklch, var(--accent) 50%, var(--surface)); }
+.vw-content .vw-heatmap-cell[data-level="3"] { background: color-mix(in oklch, var(--accent) 75%, var(--surface)); }
+.vw-content .vw-heatmap-cell[data-level="4"] { background: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .vw-content .vw-db tbody tr, .vw-content .vw-icon-btn, .vw-content .vw-newrow { transition: none; }
+  .vw-content .vw-progress-fill { transition: none; }
+}
