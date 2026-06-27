@@ -146,7 +146,7 @@ export default function PluginsPage({ onOpenSidePanel, onOpenBottomPanel }: { on
               </span>
               <div className="min-w-0 flex-1">
                 <h3 className="text-sm font-semibold text-[var(--ink)]">Add a custom plugin</h3>
-                <p className="mt-1 text-xs leading-5 text-[var(--ink-secondary)]">Drop a plugin folder into the repository to extend Neuron with your own panels, commands, and components. Folder-loaded plugins are coming soon.</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--ink-secondary)]">Drop a plugin folder into the workspace to extend Neuron with your own panels, commands, and components. Folder-loaded plugins are coming soon.</p>
               </div>
               <Button size="sm" variant="outline" disabled>Coming soon</Button>
             </div>

@@ -18,8 +18,8 @@ export default function RepositoryOnboarding({ recents, onCreate, onOpen, onSwit
             <FolderGit2 className="h-5 w-5" strokeWidth={2.2} />
           </span>
           <div>
-            <h1 className="text-lg font-semibold tracking-[-0.01em] text-[var(--ink)]">Open a repository</h1>
-            <p className="text-sm text-[var(--ink-secondary)]">A repository is just a folder of Markdown notes — local, or inside a synced folder.</p>
+            <h1 className="text-lg font-semibold tracking-[-0.01em] text-[var(--ink)]">Open a workspace</h1>
+            <p className="text-sm text-[var(--ink-secondary)]">A workspace is just a folder of Markdown notes — local, or inside a synced folder.</p>
           </div>
         </div>
 
@@ -31,8 +31,8 @@ export default function RepositoryOnboarding({ recents, onCreate, onOpen, onSwit
             <span className="grid h-9 w-9 place-items-center rounded-md border border-[var(--divider)] bg-[var(--canvas)] text-[var(--accent-strong)]">
               <FolderPlus className="h-4 w-4" />
             </span>
-            <h2 className="mt-3 text-sm font-semibold text-[var(--ink)]">Create repository</h2>
-            <p className="mt-1 text-xs leading-5 text-[var(--ink-secondary)]">Pick a location and start a fresh repository with a welcome note.</p>
+            <h2 className="mt-3 text-sm font-semibold text-[var(--ink)]">Create workspace</h2>
+            <p className="mt-1 text-xs leading-5 text-[var(--ink-secondary)]">Pick a location and start a fresh workspace with a welcome note.</p>
             <span className="mt-3 flex items-center gap-1 text-xs font-medium text-[var(--accent-strong)] opacity-0 transition-opacity group-hover:opacity-100">
               New folder <ArrowRight className="h-3 w-3" />
             </span>

@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Blocks, ChevronRight, FileCode2, Files, FolderClosed, FolderGit2, FolderOpen, Network, Plus, Search, Settings, Tag, Trash2, X } from 'lucide-react';
+import { Blocks, ChevronRight, FileCode2, FolderClosed, FolderGit2, FolderOpen, Plus, Search, Settings, Tag, Trash2, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-type View = 'notes' | 'graph' | 'repositories' | 'plugins' | 'settings';
+type View = 'notes' | 'repositories' | 'plugins' | 'settings' | 'gallery';
 
 interface SidebarProps {
   notes: string[];
@@ -70,7 +70,7 @@ export default function Sidebar(props: SidebarProps) {
   };
 
   const renderFile = (file: { name: string; path: string }, depth: number) => {
-    const isSelected = selectedNote === file.path && (view === 'notes' || view === 'graph');
+    const isSelected = selectedNote === file.path && view === 'notes';
     const isConfirming = pendingDelete === file.path;
     return (
       <div key={file.path} className="note-row group interactive mb-0.5 flex items-center gap-2 pr-2" data-selected={isSelected} style={{ paddingLeft: `${8 + depth * 14}px` }}>
@@ -128,15 +128,10 @@ export default function Sidebar(props: SidebarProps) {
               : 'border-[var(--divider)] text-[var(--ink-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--ink)]',
           )}
         >
-          <FolderGit2 className="h-3.5 w-3.5 text-[var(--accent-strong)]" /> Repositories
+          <FolderGit2 className="h-3.5 w-3.5 text-[var(--accent-strong)]" /> Workspaces
         </button>
 
-        <div className="mode-switch" aria-label="Workspace mode">
-          <button aria-pressed={view === 'notes'} className="interactive flex items-center justify-center gap-1.5 text-xs font-medium" onClick={() => onNavigate('notes')}><Files className="h-3.5 w-3.5" />Notes</button>
-          <button aria-pressed={view === 'graph'} className="interactive flex items-center justify-center gap-1.5 text-xs font-medium" onClick={() => onNavigate('graph')}><Network className="h-3.5 w-3.5" />Graph</button>
-        </div>
-
-        <label className="relative mt-3 block">
+        <label className="relative mt-1 block">
           <span className="sr-only">Search notes</span>
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--ink-muted)]" />
           <input className="field py-1.5 pl-8 pr-8 text-xs" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search notes" />

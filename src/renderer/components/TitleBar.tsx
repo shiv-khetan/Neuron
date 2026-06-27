@@ -95,15 +95,15 @@ export default function TitleBar(props: TitleBarProps) {
           <DropdownMenuTrigger asChild>
             <button className="titlebar-no-drag interactive flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-[var(--ink-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--ink)]">
               <FolderGit2 className="h-3.5 w-3.5 shrink-0 text-[var(--accent-strong)]" />
-              <span className="max-w-[160px] truncate text-xs font-medium">{repository?.name ?? 'No repository'}</span>
+              <span className="max-w-[160px] truncate text-xs font-medium">{repository?.name ?? 'No workspace'}</span>
               {repository?.cloud && <Cloud className="h-3 w-3 shrink-0 text-[var(--ink-muted)]" />}
               <ChevronDown className="h-3 w-3 shrink-0 text-[var(--ink-muted)]" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuLabel>Repository</DropdownMenuLabel>
+            <DropdownMenuLabel>Workspace</DropdownMenuLabel>
             <DropdownMenuItem onClick={props.onOpenRepo}><FolderOpen className="h-4 w-4" /> Open folder…</DropdownMenuItem>
-            <DropdownMenuItem onClick={props.onCreateRepo}><FolderPlus className="h-4 w-4" /> Create repository…</DropdownMenuItem>
+            <DropdownMenuItem onClick={props.onCreateRepo}><FolderPlus className="h-4 w-4" /> Create workspace…</DropdownMenuItem>
             {recents.length > 0 && (
               <>
                 <DropdownMenuSeparator />

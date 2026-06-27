@@ -41,8 +41,8 @@ export default function RepositoriesPage({ current, recents, onCreate, onOpen, o
     <div className="canvas-surface flex h-full w-full flex-col">
       <header className="flex items-center justify-between gap-3 border-b divider-color px-6 py-4">
         <div>
-          <h1 className="text-base font-semibold tracking-[-0.01em] text-[var(--ink)]">Repositories</h1>
-          <p className="mt-1 text-xs text-[var(--ink-secondary)]">Every repository you've opened. A repository is just a folder of notes — local or in a synced folder.</p>
+          <h1 className="text-base font-semibold tracking-[-0.01em] text-[var(--ink)]">Workspaces</h1>
+          <p className="mt-1 text-xs text-[var(--ink-secondary)]">Every workspace you've opened. A workspace is just a folder of notes — local or in a synced folder like OneDrive or Google Drive.</p>
         </div>
         <div className="flex shrink-0 gap-2">
           <Button size="sm" variant="outline" onClick={onOpen}><FolderOpen className="h-3.5 w-3.5" /> Open folder</Button>
@@ -53,7 +53,7 @@ export default function RepositoriesPage({ current, recents, onCreate, onOpen, o
       <ScrollArea className="min-h-0 flex-1">
         <div className="p-6">
           {repos.length === 0 ? (
-            <p className="py-16 text-center text-sm text-[var(--ink-muted)]">No repositories yet. Create one or open a folder to begin.</p>
+            <p className="py-16 text-center text-sm text-[var(--ink-muted)]">No workspaces yet. Create one or open a folder to begin.</p>
           ) : (
             <div className="overflow-hidden rounded-lg border border-[var(--divider)]">
               <table className="w-full text-left text-sm">
@@ -117,7 +117,7 @@ export default function RepositoriesPage({ current, recents, onCreate, onOpen, o
               </table>
             </div>
           )}
-          <p className="mt-3 text-[11px] text-[var(--ink-muted)]">Remove only forgets a repository from this list — its folder and notes stay on disk.</p>
+          <p className="mt-3 text-[11px] text-[var(--ink-muted)]">Remove only forgets a workspace from this list — its folder and notes stay on disk.</p>
         </div>
       </ScrollArea>
     </div>

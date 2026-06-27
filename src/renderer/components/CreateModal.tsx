@@ -80,7 +80,7 @@ export default function CreateModal({ open, onOpenChange, sections, initialSecti
             <div className="space-y-1.5">
               <label className="text-[11px] font-medium text-[var(--ink-secondary)]" htmlFor="note-section">Section</label>
               <select id="note-section" className="field h-9 px-2.5 text-sm" value={noteSection} onChange={(e) => setNoteSection(e.target.value)}>
-                <option value="">Repository root</option>
+                <option value="">Workspace root</option>
                 {sections.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
@@ -99,7 +99,7 @@ export default function CreateModal({ open, onOpenChange, sections, initialSecti
             <div className="space-y-1.5">
               <label className="text-[11px] font-medium text-[var(--ink-secondary)]" htmlFor="section-parent">Parent section</label>
               <select id="section-parent" className="field h-9 px-2.5 text-sm" value={noteSection} onChange={(e) => setNoteSection(e.target.value)}>
-                <option value="">Repository root</option>
+                <option value="">Workspace root</option>
                 {sections.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
