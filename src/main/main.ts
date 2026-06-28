@@ -1,12 +1,18 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, session } from 'electron';
+import { autoUpdater } from 'electron-updater';
+import { importChromeCookies } from './chrome-cookies';
 import * as path from 'path';
 import * as fs from 'fs';
 import chokidar from 'chokidar';
 import { exec } from 'child_process';
+import * as pty from 'node-pty';
 
 
 let mainWindow: BrowserWindow | null = null;
 let watcher: chokidar.FSWatcher | null = null;
+
+// Workspace files: Markdown notes, .vw block-view declarations, and the internal shell config.
+const WORKSPACE_FILE = /(^\.neuron[\/\\]layout\.json$|^neuron\.config$|\.(md|mdx|vw|db|canvas)$)/;
 
 // ==========================================================================
 // Settings store — JSON file in userData. Holds the active/recent
@@ -117,8 +123,8 @@ function setActiveRepo(dir: string): void {
 function seedWelcomeNote(dir: string): void {
   try {
     const entries = fs.readdirSync(dir).filter((f) => /\.(md|mdx)$/.test(f));
-    if (entries.length > 0) return; // don't overwrite an existing repository
-    const welcome = `# Welcome to ${path.basename(dir)}\n\nThis is your Neuron repository — just a folder of local \`.md\`/\`.mdx\` files.\n\nLink notes with [[Another note]] and group them into sections (folders).\n`;
+    if (entries.length > 0) return; // don't overwrite an existing workspace
+    const welcome = `# Welcome to ${path.basename(dir)}\n\nThis is your Neuron workspace — just a folder of local \`.md\`/\`.mdx\` files.\n\nLink notes with [[Another note]] and group them into sections (folders).\n`;
     fs.writeFileSync(path.join(dir, 'welcome.mdx'), welcome, 'utf-8');
   } catch (err) {
     console.error('Failed to seed welcome note:', err);
@@ -138,7 +144,8 @@ function setupWatcher() {
   if (!dir) return;
 
   watcher = chokidar.watch(dir, {
-    ignored: /(^|[\/\\])\../,
+    // Ignore dot-entries except .neuron, the workspace's own config folder.
+    ignored: /(^|[\/\\])\.(?!neuron([\/\\]|$))/,
     persistent: true,
     ignoreInitial: true,
   });
@@ -146,7 +153,7 @@ function setupWatcher() {
   watcher.on('all', (event, filePath) => {
     if (!mainWindow) return;
     const relativePath = path.relative(dir, filePath);
-    if (relativePath.endsWith('.md') || relativePath.endsWith('.mdx')) {
+    if (WORKSPACE_FILE.test(relativePath)) {
       mainWindow.webContents.send('notes:changed', event, relativePath.replace(/\\/g, '/'));
     }
   });
@@ -173,6 +180,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      webviewTag: true, // enables in-app browser tabs (<webview>)
     },
     backgroundColor: '#11181c',
   });
@@ -193,6 +201,7 @@ function createWindow() {
   mainWindow.on('unmaximize', emitMaxState);
 
   mainWindow.on('closed', () => {
+    killAllPtys();
     mainWindow = null;
   });
 
@@ -245,7 +254,7 @@ ipcMain.handle('repository:list-recent', () => {
 ipcMain.handle('repository:create', async () => {
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Create or choose a repository folder',
+    title: 'Create or choose a workspace folder',
     buttonLabel: 'Use this folder',
     properties: ['openDirectory', 'createDirectory'],
   });
@@ -259,8 +268,8 @@ ipcMain.handle('repository:create', async () => {
 ipcMain.handle('repository:open', async () => {
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Open a repository folder',
-    buttonLabel: 'Open repository',
+    title: 'Open a workspace folder',
+    buttonLabel: 'Open workspace',
     properties: ['openDirectory'],
   });
   if (result.canceled || result.filePaths.length === 0) return null;
@@ -319,33 +328,35 @@ function resolveInRepo(relativePath: string): { repo: string; fullPath: string }
   return { repo, fullPath };
 }
 
-ipcMain.handle('notes:list', async () => {
-  const repo = activeRepoPath();
-  if (!repo) return [];
+function walkRepoFiles(repo: string): string[] {
   const files: string[] = [];
   const scanDir = (dir: string) => {
     for (const item of fs.readdirSync(dir)) {
       if (item.startsWith('.')) continue;
       const fullPath = path.join(dir, item);
       const stat = fs.statSync(fullPath);
-      if (stat.isDirectory()) {
-        scanDir(fullPath);
-      } else if (/\.(md|mdx)$/.test(item)) {
-        files.push(path.relative(repo, fullPath).replace(/\\/g, '/'));
-      }
+      if (stat.isDirectory()) scanDir(fullPath);
+      else files.push(path.relative(repo, fullPath).replace(/\\/g, '/'));
     }
   };
+  scanDir(repo);
+  return files;
+}
+
+ipcMain.handle('notes:list', async () => {
+  const repo = activeRepoPath();
+  if (!repo) return [];
   try {
-    scanDir(repo);
+    return walkRepoFiles(repo).filter((file) => WORKSPACE_FILE.test(file));
   } catch (err) {
     console.error('Failed to list notes:', err);
   }
-  return files;
+  return [];
 });
 
 ipcMain.handle('notes:read', async (_event, relativePath: string) => {
   const resolved = resolveInRepo(relativePath);
-  if (!resolved) return 'Error: No repository is open.';
+  if (!resolved) return 'Error: No workspace is open.';
   try {
     return fs.readFileSync(resolved.fullPath, 'utf-8');
   } catch (err: unknown) {
@@ -357,11 +368,14 @@ ipcMain.handle('notes:read', async (_event, relativePath: string) => {
 
 ipcMain.handle('notes:write', async (_event, relativePath: string, content: string) => {
   const resolved = resolveInRepo(relativePath);
-  if (!resolved) return { success: false, error: 'No repository is open.' };
+  if (!resolved) return { success: false, error: 'No workspace is open.' };
   try {
     const dir = path.dirname(resolved.fullPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(resolved.fullPath, content, 'utf-8');
+    // Atomic write: a crash mid-write must never leave a half-written note or database.
+    const tmp = `${resolved.fullPath}.tmp`;
+    fs.writeFileSync(tmp, content, 'utf-8');
+    fs.renameSync(tmp, resolved.fullPath);
     return { success: true };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -372,7 +386,7 @@ ipcMain.handle('notes:write', async (_event, relativePath: string, content: stri
 
 ipcMain.handle('notes:delete', async (_event, relativePath: string) => {
   const resolved = resolveInRepo(relativePath);
-  if (!resolved) return { success: false, error: 'No repository is open.' };
+  if (!resolved) return { success: false, error: 'No workspace is open.' };
   try {
     if (fs.existsSync(resolved.fullPath)) fs.unlinkSync(resolved.fullPath);
     return { success: true };
@@ -385,7 +399,7 @@ ipcMain.handle('notes:delete', async (_event, relativePath: string) => {
 
 ipcMain.handle('notes:create-section', async (_event, relativePath: string) => {
   const resolved = resolveInRepo(relativePath);
-  if (!resolved) return { success: false, error: 'No repository is open.' };
+  if (!resolved) return { success: false, error: 'No workspace is open.' };
   try {
     fs.mkdirSync(resolved.fullPath, { recursive: true });
     return { success: true };
@@ -397,6 +411,136 @@ ipcMain.handle('notes:create-section', async (_event, relativePath: string) => {
 });
 
 ipcMain.handle('notes:get-dir', () => activeRepoPath());
+
+// ==========================================================================
+// IPC - .vw view sources and actions
+// ==========================================================================
+
+function extensionOf(file: string): string {
+  const ext = path.extname(file).replace(/^\./, '').toLowerCase();
+  return ext || '(none)';
+}
+
+ipcMain.handle('views:source', async (_event, request: { type: string; glob?: string; limit?: number } = { type: 'fileCount' }) => {
+  const repo = activeRepoPath();
+  if (!repo) return { success: false, error: 'No workspace is open.' };
+  try {
+    const files = walkRepoFiles(repo);
+    const matcher = request.glob
+      ? new RegExp(`^${request.glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`, 'i')
+      : null;
+    const visible = matcher ? files.filter((file) => matcher.test(file)) : files;
+    const byExtension = visible.reduce<Record<string, number>>((acc, file) => {
+      const ext = extensionOf(file);
+      acc[ext] = (acc[ext] ?? 0) + 1;
+      return acc;
+    }, {});
+    if (request.type === 'fileTable') {
+      return {
+        success: true,
+        rows: visible.slice(0, request.limit ?? 25).map((file) => {
+          const fullPath = path.join(repo, file);
+          const stat = fs.statSync(fullPath);
+          return { path: file, extension: extensionOf(file), size: stat.size, modified: stat.mtime.toISOString() };
+        }),
+      };
+    }
+    return { success: true, count: visible.length, byExtension };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: message };
+  }
+});
+
+ipcMain.handle('views:action', async (_event, action: { type: string; path?: string; content?: string }) => {
+  const repo = activeRepoPath();
+  if (!repo) return { success: false, error: 'No workspace is open.' };
+  const target = action.path ? path.join(repo, path.normalize(action.path)) : repo;
+  if (!target.startsWith(repo)) return { success: false, error: 'Action path must stay inside the active workspace.' };
+  if (action.type === 'createFile') {
+    if (!action.path) return { success: false, error: 'createFile needs a "path".' };
+    try {
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      if (!fs.existsSync(target)) fs.writeFileSync(target, action.content ?? '', 'utf-8');
+      return { success: true };
+    } catch (err: unknown) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+  if (action.type === 'openInVSCode') {
+    return new Promise((resolve) => {
+      exec(`code .`, { cwd: target }, (error, stdout, stderr) => {
+        resolve({ success: !error, stdout: stdout || '', stderr: stderr || '', code: error?.code ?? 0 });
+      });
+    });
+  }
+  if (action.type === 'reveal') {
+    shell.showItemInFolder(target);
+    return { success: true };
+  }
+  return { success: false, error: `Unknown view action "${action.type}".` };
+});
+
+// RFC4180-ish CSV parser: handles quoted fields, escaped quotes, and CRLF.
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; } else { inQuotes = false; }
+      } else { field += c; }
+      continue;
+    }
+    if (c === '"') { inQuotes = true; }
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+    else if (c !== '\r') { field += c; }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.filter((r) => !(r.length === 1 && r[0] === ''));
+}
+
+// Read a referenced CSV (the "database from a CSV location" feature) into a
+// header + rows table the renderer can display Notion-style.
+ipcMain.handle('views:csv', (_event, relativePath: string) => {
+  const resolved = resolveInRepo(relativePath);
+  if (!resolved) return { success: false, error: 'No workspace is open.' };
+  try {
+    if (!fs.existsSync(resolved.fullPath)) return { success: false, error: `CSV not found: ${relativePath}` };
+    const matrix = parseCsv(fs.readFileSync(resolved.fullPath, 'utf-8'));
+    if (matrix.length === 0) return { success: true, columns: [], rows: [] };
+    const [header, ...body] = matrix;
+    return { success: true, columns: header, rows: body.map((r) => header.map((_, i) => r[i] ?? '')) };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+// Read a workspace image for <gallery> as a data URL.
+// ponytail: whole-file base64 over IPC — fine for note-sized images; switch to a custom protocol if galleries get huge.
+const IMAGE_MIME: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', bmp: 'image/bmp', ico: 'image/x-icon' };
+ipcMain.handle('views:file', (_event, relativePath: string) => {
+  const resolved = resolveInRepo(relativePath);
+  if (!resolved) return { success: false, error: 'No workspace is open.' };
+  try {
+    if (!fs.existsSync(resolved.fullPath)) return { success: false, error: `File not found: ${relativePath}` };
+    const mime = IMAGE_MIME[path.extname(resolved.fullPath).slice(1).toLowerCase()];
+    if (!mime) return { success: false, error: `Not an image: ${relativePath}` };
+    return { success: true, dataUrl: `data:${mime};base64,${fs.readFileSync(resolved.fullPath).toString('base64')}` };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+// Pull Chrome's cookies into the in-app browser's persistent session so the
+// user stays logged in without signing in again.
+ipcMain.handle('cookies:import-chrome', (_event, domain?: string) =>
+  importChromeCookies(session.fromPartition('persist:neuron-browser'), domain),
+);
 
 ipcMain.handle('terminal:run', async (_event, cmd: string) => {
   const dir = activeRepoPath() || process.cwd();
@@ -410,6 +554,59 @@ ipcMain.handle('terminal:run', async (_event, cmd: string) => {
       });
     });
   });
+});
+
+// ==========================================================================
+// IPC — interactive PTY terminals (node-pty). One pty per renderer terminal;
+// output is streamed back over `terminal:data`. Used by the terminal panel.
+// ==========================================================================
+
+const ptys = new Map<number, pty.IPty>();
+let nextPtyId = 1;
+
+const defaultShell = () =>
+  process.platform === 'win32'
+    ? process.env.COMSPEC || 'cmd.exe'
+    : process.env.SHELL || '/bin/bash';
+
+function killAllPtys() {
+  for (const p of ptys.values()) {
+    try { p.kill(); } catch { /* already gone */ }
+  }
+  ptys.clear();
+}
+
+ipcMain.handle('terminal:spawn', (_event, opts: { cols?: number; rows?: number } = {}) => {
+  const id = nextPtyId++;
+  const proc = pty.spawn(defaultShell(), [], {
+    name: 'xterm-color',
+    cols: opts.cols ?? 80,
+    rows: opts.rows ?? 24,
+    cwd: activeRepoPath() || process.cwd(),
+    env: process.env as { [key: string]: string },
+  });
+  ptys.set(id, proc);
+  proc.onData((data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('terminal:data', id, data);
+  });
+  proc.onExit(({ exitCode }) => {
+    ptys.delete(id);
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('terminal:exit', id, exitCode);
+  });
+  return id;
+});
+
+ipcMain.handle('terminal:write', (_event, id: number, data: string) => {
+  try { ptys.get(id)?.write(data); } catch { /* pty closed */ }
+});
+
+ipcMain.handle('terminal:resize', (_event, id: number, cols: number, rows: number) => {
+  try { ptys.get(id)?.resize(Math.max(1, cols), Math.max(1, rows)); } catch { /* pty closed */ }
+});
+
+ipcMain.handle('terminal:kill', (_event, id: number) => {
+  const proc = ptys.get(id);
+  if (proc) { try { proc.kill(); } catch { /* already gone */ } ptys.delete(id); }
 });
 
 // ==========================================================================
@@ -598,9 +795,55 @@ ipcMain.handle(
   },
 );
 
+// ==========================================================================
+// Security — harden every web-contents, especially the in-app browser
+// <webview>. The main process is the authoritative gate: renderer-set webview
+// options can't weaken these.
+// ==========================================================================
+
+app.on('web-contents-created', (_event, contents) => {
+  // 1. Force-safe options on any <webview> before it attaches: no preload, no
+  //    Node, context isolation + sandbox on. (Electron security checklist #17.)
+  contents.on('will-attach-webview', (_e, webPreferences) => {
+    delete webPreferences.preload;
+    webPreferences.nodeIntegration = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.sandbox = true;
+  });
+
+  // 2. Never let a page spawn a new Electron window; hand http(s) popups to the
+  //    OS browser and deny everything else.
+  contents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//.test(url)) void shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
+  // 3. The app's own frame may not be navigated away from its bundled content
+  //    (clickjacking / drive-by nav). A <webview> IS a browser, so it may roam.
+  contents.on('will-navigate', (event, url) => {
+    if (contents.getType() === 'webview') return;
+    const allowed = url.startsWith('http://localhost:5173') || url.startsWith('file://');
+    if (!allowed) {
+      event.preventDefault();
+      if (/^https?:\/\//.test(url)) void shell.openExternal(url);
+    }
+  });
+
+  // 4. Deny all permission requests (camera, mic, geolocation, …) from the
+  //    embedded browser; scoped to the webview session so the app is untouched.
+  if (contents.getType() === 'webview') {
+    contents.session.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+  }
+});
+
 app.on('ready', () => {
   ensureDefaultRepo();
   createWindow();
+  // GitHub-backed auto-update for NSIS builds. Store builds
+  // (process.windowsStore) update through the Store, so skip them; dev skips too.
+  if (app.isPackaged && app.getName() === 'neuron' && !(process as NodeJS.Process & { windowsStore?: boolean }).windowsStore) {
+    autoUpdater.checkForUpdatesAndNotify().catch((err) => console.error('Update check failed:', err));
+  }
 });
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

@@ -66,6 +66,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   terminal: {
     run: (cmd: string) => ipcRenderer.invoke('terminal:run', cmd),
+    spawn: (opts: { cols?: number; rows?: number }) => ipcRenderer.invoke('terminal:spawn', opts),
+    write: (id: number, data: string) => ipcRenderer.invoke('terminal:write', id, data),
+    resize: (id: number, cols: number, rows: number) => ipcRenderer.invoke('terminal:resize', id, cols, rows),
+    kill: (id: number) => ipcRenderer.invoke('terminal:kill', id),
+    onData: (callback: (id: number, data: string) => void) => {
+      const listener = (_event: unknown, id: number, data: string) => callback(id, data);
+      ipcRenderer.on('terminal:data', listener);
+      return () => ipcRenderer.removeListener('terminal:data', listener);
+    },
+    onExit: (callback: (id: number, exitCode: number) => void) => {
+      const listener = (_event: unknown, id: number, exitCode: number) => callback(id, exitCode);
+      ipcRenderer.on('terminal:exit', listener);
+      return () => ipcRenderer.removeListener('terminal:exit', listener);
+    },
+  },
+  views: {
+    source: (request: { type: string; glob?: string; limit?: number }) => ipcRenderer.invoke('views:source', request),
+    action: (action: { type: string; path?: string; content?: string }) => ipcRenderer.invoke('views:action', action),
+    csv: (relativePath: string) => ipcRenderer.invoke('views:csv', relativePath),
+    file: (relativePath: string) => ipcRenderer.invoke('views:file', relativePath),
+  },
+  cookies: {
+    importChrome: (domain?: string) => ipcRenderer.invoke('cookies:import-chrome', domain),
   },
 });
-

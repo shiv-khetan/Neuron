@@ -30,6 +30,21 @@ export interface NetRequestResult {
   error?: string;
 }
 
+export interface ViewSourceResult {
+  success: boolean;
+  count?: number;
+  byExtension?: Record<string, number>;
+  rows?: { path: string; extension: string; size: number; modified: string }[];
+  error?: string;
+}
+
+export interface ViewCsvResult {
+  success: boolean;
+  columns?: string[];
+  rows?: string[][];
+  error?: string;
+}
+
 export interface ElectronAPI {
   // Notes
   listNotes: () => Promise<string[]>;
@@ -83,6 +98,22 @@ export interface ElectronAPI {
   };
   terminal: {
     run: (cmd: string) => Promise<{ success: boolean; stdout: string; stderr: string; code: number }>;
+    /** Spawn an interactive PTY in the active repo; returns its id. */
+    spawn: (opts: { cols?: number; rows?: number }) => Promise<number>;
+    write: (id: number, data: string) => Promise<void>;
+    resize: (id: number, cols: number, rows: number) => Promise<void>;
+    kill: (id: number) => Promise<void>;
+    onData: (callback: (id: number, data: string) => void) => () => void;
+    onExit: (callback: (id: number, exitCode: number) => void) => () => void;
+  };
+  views: {
+    source: (request: { type: string; glob?: string; limit?: number }) => Promise<ViewSourceResult>;
+    action: (action: { type: string; path?: string; content?: string }) => Promise<{ success: boolean; stdout?: string; stderr?: string; code?: number; error?: string }>;
+    csv: (relativePath: string) => Promise<ViewCsvResult>;
+    file: (relativePath: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
+  };
+  cookies: {
+    importChrome: (domain?: string) => Promise<{ success: boolean; imported?: number; skipped?: number; error?: string }>;
   };
 }
 
