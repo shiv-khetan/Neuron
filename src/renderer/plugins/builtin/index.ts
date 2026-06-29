@@ -3,6 +3,7 @@ import aiClaude from './ai-claude';
 import aiLocal from './ai-local';
 import dailyCalendar from './daily-calendar';
 import terminal from './terminal';
+import automations from './automations';
 import aiOpenai from './ai-openai';
 import aiGemini from './ai-gemini';
 import aiOpenrouter from './ai-openrouter';
@@ -13,6 +14,7 @@ export const builtinPlugins: PluginModule[] = [
   aiLocal,
   dailyCalendar,
   terminal,
+  automations,
   aiOpenai,
   aiGemini,
   aiOpenrouter,
