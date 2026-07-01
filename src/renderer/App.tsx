@@ -4,7 +4,6 @@ import Sidebar from './components/Sidebar';
 import Editor from './components/Editor';
 import MDXPreview from './components/MDXPreview';
 import LiveEditor from './components/LiveEditor';
-import SearchAndGraph from './components/SearchAndGraph';
 import TitleBar from './components/TitleBar';
 import StatusBar from './components/StatusBar';
 import RightPanel from './components/RightPanel';
@@ -15,18 +14,69 @@ import NoteTabs from './components/NoteTabs';
 import RepositoriesPage from './views/RepositoriesPage';
 import PluginsPage from './views/PluginsPage';
 import SettingsPage from './views/SettingsPage';
+import ComponentGallery from './views/ComponentGallery';
 import { TooltipProvider } from './components/ui/tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuCheckboxItem, DropdownMenuTrigger } from './components/ui/dropdown-menu';
 import { PluginProvider } from './plugins/host';
 import { builtinPlugins } from './plugins/builtin';
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+import { getSurface } from './surfaces';
+import LayoutSurface from './surfaces/LayoutSurface';
+import './surfaces/ViewSurface'; // registers the .vw block view surface
+import './surfaces/DbSurface'; // registers the .db database surface
+import './surfaces/CanvasSurface'; // registers the .canvas JSON Canvas surface
+import { SurfaceBoundary } from './surfaces/SurfaceBoundary';
+import BrowserView from './components/BrowserView';
+import { DEFAULT_BINDINGS, eventToChord, resolveBindings, type Bindings } from './lib/keybindings';
+
+const isUrl = (s: string | null): s is string => !!s && /^https?:\/\//.test(s);
+
+// The workspace's own config lives in a .neuron folder at the workspace root.
+const SHELL_CONFIG = '.neuron/layout.json';
 import type { RepositoryInfo } from './electron.d';
 import { applyTheme, DEFAULT_APPEARANCE, normalizeAppearance, PRESETS, type Appearance } from './lib/theme';
 
 interface NoteData { path: string; content: string }
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
-type View = 'notes' | 'graph' | 'repositories' | 'plugins' | 'settings';
+type View = 'notes' | 'repositories' | 'plugins' | 'settings' | 'gallery';
 type EditorMode = 'live' | 'raw' | 'reading';
+
+// Default content for .vw file-driven block views.
+const VIEW_TEMPLATE = `<h1>Workspace view</h1>
+<p>.vw views are HTML with Tailwind classes. Use layout utilities like
+<code>grid</code> and <code>flex</code>, plus view tags such as
+<code>&lt;metric&gt;</code>, <code>&lt;filegraph&gt;</code>, and <code>&lt;csvtable&gt;</code>.</p>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <metric title="Status" value="Ready" hint="Hand-curated value." />
+  <filecount title="Markdown notes" glob="*.mdx" />
+  <filecount title="View files" glob="*.vw" />
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <filegraph title="Files by type" />
+  <filetable title="Recent files" limit="10" />
+</div>
+
+<div class="flex flex-wrap gap-3">
+  <button label="Open workspace in VS Code" action="openInVSCode" />
+  <button label="Reveal workspace" action="reveal" />
+</div>
+`;
+
+const NEURON_CONFIG_TEMPLATE = `{
+  "direction": "horizontal",
+  "children": [
+    { "size": 20, "panel": { "type": "tree" } },
+    { "size": 52, "group": { "direction": "vertical", "children": [
+      { "size": 70, "panel": { "type": "editor" } },
+      { "size": 30, "panel": { "type": "terminal" } }
+    ] } },
+    { "size": 28, "panel": { "type": "graph", "scope": "active", "title": "Linked notes" } }
+  ]
+}
+`;
 
 export default function App() {
   const [repository, setRepository] = useState<RepositoryInfo | null>(null);
@@ -54,9 +104,14 @@ export default function App() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createSection, setCreateSection] = useState('');
   const [wide, setWide] = useState(true);
+  const [bindings, setBindings] = useState<Bindings>(DEFAULT_BINDINGS);
+  const [surfaceSourceMode, setSurfaceSourceMode] = useState<Record<string, boolean>>({});
+  const [shellConfig, setShellConfig] = useState<string | null>(null);
+  const [pendingShellConfig, setPendingShellConfig] = useState<string | null>(null);
 
   const saveVersion = useRef(0);
   const editorRef = useRef<any>(null);
+  const browserCounter = useRef(0);
 
   // --- Appearance -----------------------------------------------------------
   useLayoutEffect(() => {
@@ -137,7 +192,7 @@ export default function App() {
       });
       setTags(Array.from(allTags).sort((a, b) => a.localeCompare(b)));
     } catch {
-      setNotice('Could not load the repository.');
+      setNotice('Could not load the workspace.');
     }
   }, []);
 
@@ -147,14 +202,42 @@ export default function App() {
   }, [repository, loadNotes]);
 
   useEffect(() => {
+    if (!repository || !window.electronAPI) { setShellConfig(null); return; }
+    let cancelled = false;
+    void (async () => {
+      let content = await window.electronAPI.readNote(SHELL_CONFIG);
+      if (content.startsWith('Error:')) {
+        // Migrate the legacy root-level neuron.config into .neuron/layout.json.
+        const legacy = await window.electronAPI.readNote('neuron.config');
+        if (legacy.startsWith('Error:')) { if (!cancelled) setShellConfig(null); return; }
+        await window.electronAPI.writeNote(SHELL_CONFIG, legacy);
+        content = legacy;
+      }
+      if (!cancelled) setShellConfig(content);
+    })();
+    return () => { cancelled = true; };
+  }, [repository]);
+
+  useEffect(() => {
     if (!window.electronAPI?.onNotesChanged) return;
-    return window.electronAPI.onNotesChanged(() => loadNotes());
+    return window.electronAPI.onNotesChanged((_event, path) => {
+      void loadNotes();
+      if (path !== SHELL_CONFIG) return;
+      void window.electronAPI?.readNote(SHELL_CONFIG).then((content) => {
+        if (content.startsWith('Error:')) {
+          setShellConfig(null);
+          setPendingShellConfig(null);
+          return;
+        }
+        setPendingShellConfig(content);
+      });
+    });
   }, [loadNotes]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!selectedNote || !window.electronAPI) { setNoteContent(''); setSaveState('idle'); return; }
+      if (!selectedNote || isUrl(selectedNote) || !window.electronAPI) { setNoteContent(''); setSaveState('idle'); return; }
       try {
         const content = await window.electronAPI.readNote(selectedNote);
         if (!cancelled) { setNoteContent(content); setSaveState('saved'); }
@@ -168,7 +251,7 @@ export default function App() {
   const handleSelectNote = useCallback((note: string) => {
     setSelectedNote(note);
     setOpenTabs((current) => current.includes(note) ? current : [...current, note]);
-    setView((v) => (v === 'graph' ? 'graph' : 'notes'));
+    setView('notes');
     setNotice(null);
   }, []);
 
@@ -219,12 +302,52 @@ export default function App() {
     const result = await window.electronAPI.writeNote(selectedNote, value);
     if (version !== saveVersion.current) return;
     setSaveState(result.success ? 'saved' : 'error');
+    if (result.success && selectedNote === SHELL_CONFIG) setPendingShellConfig(value);
     if (!result.success) setNotice(`Changes to “${selectedNote}” could not be saved.`);
   }, [selectedNote]);
 
   const requestCreate = useCallback((section?: string) => {
     setCreateSection(section ?? '');
     setCreateOpen(true);
+  }, []);
+
+  // Create a .vw block view in the current note's folder.
+  const createSurfaceFile = useCallback(async () => {
+    const folder = selectedNote && selectedNote.includes('/') ? selectedNote.slice(0, selectedNote.lastIndexOf('/') + 1) : '';
+    let name = 'View.vw';
+    let i = 2;
+    while (notes.includes(`${folder}${name}`)) name = `View ${i++}.vw`;
+    await createNote(`${folder}${name}`, VIEW_TEMPLATE);
+  }, [selectedNote, notes, createNote]);
+
+  const toggleShell = useCallback(async () => {
+    if (shellConfig) { setShellConfig(null); return; }
+    if (!window.electronAPI) return;
+    const existing = await window.electronAPI.readNote(SHELL_CONFIG);
+    const missing = existing.startsWith('Error:');
+    if (missing) await window.electronAPI.writeNote(SHELL_CONFIG, NEURON_CONFIG_TEMPLATE);
+    setShellConfig(missing ? NEURON_CONFIG_TEMPLATE : existing);
+    setView('notes');
+  }, [shellConfig]);
+
+  // Pull Chrome's cookies into the in-app browser session (stay logged in).
+  const importChromeLogins = useCallback(async () => {
+    if (!window.electronAPI) return;
+    setNotice('Importing Chrome logins…');
+    const r = await window.electronAPI.cookies.importChrome();
+    setNotice(r.success
+      ? `Imported ${r.imported ?? 0} Chrome cookies${r.skipped ? ` (${r.skipped} skipped)` : ''}. Open a website tab to use them.`
+      : `Chrome import failed: ${r.error ?? 'unknown error'}`);
+  }, []);
+
+  // Open a website as a browser tab. The hash keeps each new tab a distinct key;
+  // the in-view URL bar lets the user navigate anywhere from there.
+  const openWebsite = useCallback(() => {
+    const n = ++browserCounter.current;
+    const url = `https://duckduckgo.com/#neuron-tab-${n}`;
+    setSelectedNote(url);
+    setOpenTabs((current) => (current.includes(url) ? current : [...current, url]));
+    setView('notes');
   }, []);
 
   const closeTab = useCallback((note: string) => {
@@ -241,10 +364,9 @@ export default function App() {
 
   const handleLineClick = useCallback((lineIndex: number) => {
     const targetLine = lineIndex + 1;
-    let mode = selectedNote ? editorModes[selectedNote] || 'live' : 'live';
-    if (mode === 'reading') {
-      setEditorMode('raw');
-    }
+    let mode = selectedNote ? editorModes[selectedNote] || 'reading' : 'reading';
+    // In reading view, a single click shouldn't switch modes — double-click enters live.
+    if (mode === 'reading') return;
     setTimeout(() => {
       const view = editorRef.current?.view;
       if (view) {
@@ -264,7 +386,7 @@ export default function App() {
     }, 50);
   }, [selectedNote, editorModes]);
 
-  const editorMode: EditorMode = (selectedNote && editorModes[selectedNote]) || 'live';
+  const editorMode: EditorMode = (selectedNote && editorModes[selectedNote]) || 'reading';
   const setEditorMode = (mode: EditorMode) => {
     if (selectedNote) setEditorModes((prev) => ({ ...prev, [selectedNote]: mode }));
   };
@@ -298,26 +420,46 @@ export default function App() {
   }), [selectedNote, noteContent, notes, handleSelectNote, createNote, loadNotes]);
 
   // --- Responsive (raw split collapses to tabs when narrow) -----------------
+  // Panels are user-resizable, so responsive mode only needs the viewport width.
   useEffect(() => {
-    const compute = () => {
-      const available = window.innerWidth - (sidebarOpen ? 264 : 0) - (rightPanelOpen ? 340 : 0);
-      setWide(available >= 1000);
-    };
+    const compute = () => setWide(window.innerWidth >= 1100);
     compute();
     window.addEventListener('resize', compute);
     return () => window.removeEventListener('resize', compute);
-  }, [sidebarOpen, rightPanelOpen]);
+  }, []);
 
+  // Load configurable keybindings once.
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    void window.electronAPI.settings.get<Bindings>('keybindings').then((stored) => setBindings(resolveBindings(stored)));
+  }, []);
+
+  const updateBindings = useCallback((next: Bindings) => {
+    setBindings(next);
+    void window.electronAPI?.settings.set('keybindings', next);
+  }, []);
+
+  // Global shortcut dispatcher, driven by the (configurable) binding map.
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        setPaletteOpen((open) => !open);
+      const chord = eventToChord(event);
+      if (!chord) return;
+      const match = Object.entries(bindings).find(([, c]) => c === chord);
+      if (!match) return;
+      event.preventDefault();
+      switch (match[0]) {
+        case 'palette': setPaletteOpen((open) => !open); break;
+        case 'new-note': requestCreate(); break;
+        case 'new-view': void createSurfaceFile(); break;
+        case 'open-website': openWebsite(); break;
+        case 'toggle-sidebar': setSidebarOpen((v) => !v); break;
+        case 'toggle-right': setRightPanelOpen((v) => !v); break;
+        case 'toggle-bottom': setBottomPanelOpen((v) => !v); break;
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [bindings, requestCreate, createSurfaceFile, openWebsite]);
 
   const saveLabel = { idle: 'No note open', saving: 'Saving…', saved: 'Saved locally', error: 'Save failed' }[saveState];
 
@@ -340,33 +482,62 @@ export default function App() {
     </Tabs>
   );
 
+  const browsing = isUrl(selectedNote);
+  const Surface = selectedNote && !browsing ? getSurface(selectedNote) : undefined;
+  const surfaceEditing = !!(selectedNote && Surface && surfaceSourceMode[selectedNote]);
+  const setSurfaceSource = (source: boolean) => { if (selectedNote) setSurfaceSourceMode((prev) => ({ ...prev, [selectedNote]: source })); };
+
+  const editorHeader = (
+    <header className="pane-header flex items-center justify-between border-b">
+      <NoteTabs tabs={openTabs} activeTab={selectedNote ?? ''} onSelect={handleSelectNote} onClose={closeTab} onCreate={() => requestCreate()} onNewBrowser={openWebsite} />
+      {selectedNote && Surface ? (
+          <div className="flex h-full shrink-0 items-center border-l border-[var(--divider)] px-3">
+            <div className="mode-switch" aria-label="Surface mode">
+              <button aria-pressed={!surfaceEditing} className="interactive text-xs font-medium" onClick={() => setSurfaceSource(false)}>Preview</button>
+              <button aria-pressed={surfaceEditing} className="interactive text-xs font-medium" onClick={() => setSurfaceSource(true)}>Source</button>
+            </div>
+          </div>
+      ) : selectedNote && !browsing ? (
+          <div className="flex h-full shrink-0 items-center gap-3 border-l border-[var(--divider)] px-3">
+            {saveState === 'error' && <span role="status" className="text-[11px] text-[var(--danger)]">{saveLabel}</span>}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button aria-label="View options" className="interactive grid h-7 w-7 place-items-center rounded-md text-[var(--ink-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--ink)]">
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>View mode</DropdownMenuLabel>
+                <DropdownMenuCheckboxItem checked={editorMode === 'live'} onCheckedChange={() => setEditorMode('live')}><PenLine className="mr-2 h-4 w-4" /> Live editor</DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem checked={editorMode === 'raw'} onCheckedChange={() => setEditorMode('raw')}><SplitSquareHorizontal className="mr-2 h-4 w-4" /> Edit as raw file (split)</DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem checked={editorMode === 'reading'} onCheckedChange={() => setEditorMode('reading')}><Eye className="mr-2 h-4 w-4" /> Reading view</DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+      ) : null}
+    </header>
+  );
+
+
   const notesView = selectedNote ? (
     <div className="flex h-full w-full flex-col">
-      <header className="pane-header flex items-center justify-between border-b">
-        <NoteTabs tabs={openTabs} activeTab={selectedNote} onSelect={handleSelectNote} onClose={closeTab} onCreate={() => requestCreate()} />
-        <div className="flex h-full shrink-0 items-center gap-3 border-l border-[var(--divider)] px-3">
-          <span role="status" className={`flex items-center gap-2 text-[11px] ${saveState === 'error' ? 'text-[var(--danger)]' : 'text-[var(--ink-muted)]'}`}>
-            {saveState === 'saved' && <span className="status-dot" />}{saveLabel}
-          </span>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button aria-label="View options" className="interactive grid h-7 w-7 place-items-center rounded-md text-[var(--ink-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--ink)]">
-                <MoreHorizontal className="h-4 w-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>View mode</DropdownMenuLabel>
-              <DropdownMenuCheckboxItem checked={editorMode === 'live'} onCheckedChange={() => setEditorMode('live')}><PenLine className="mr-2 h-4 w-4" /> Live editor</DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem checked={editorMode === 'raw'} onCheckedChange={() => setEditorMode('raw')}><SplitSquareHorizontal className="mr-2 h-4 w-4" /> Edit as raw file (split)</DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem checked={editorMode === 'reading'} onCheckedChange={() => setEditorMode('reading')}><Eye className="mr-2 h-4 w-4" /> Reading view</DropdownMenuCheckboxItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </header>
+      {editorHeader}
       <div className="min-h-0 flex-1">
-        {editorMode === 'live' && <LiveEditor value={noteContent} onChange={handleContentChange} colorScheme={PRESETS[appearance.preset]?.colorScheme ?? 'dark'} />}
-        {editorMode === 'raw' && rawSplit}
-        {editorMode === 'reading' && <MDXPreview mdxContent={noteContent} onLineClick={handleLineClick} />}
+        {browsing ? (
+          <BrowserView key={selectedNote} url={selectedNote} />
+        ) : Surface ? (
+          surfaceEditing
+            ? <Editor ref={editorRef} value={noteContent} onChange={handleContentChange} colorScheme={PRESETS[appearance.preset]?.colorScheme ?? 'dark'} />
+            : <SurfaceBoundary resetKey={`${selectedNote}:${noteContent.length}`}><Surface path={selectedNote} content={noteContent} notesData={notesData} onSelectNote={handleSelectNote} selectedNote={selectedNote} /></SurfaceBoundary>
+        ) : (
+          <>
+            {editorMode === 'live' && <LiveEditor value={noteContent} onChange={handleContentChange} colorScheme={PRESETS[appearance.preset]?.colorScheme ?? 'dark'} />}
+            {editorMode === 'raw' && rawSplit}
+            {editorMode === 'reading' && (
+              <div className="h-full" onDoubleClick={() => setEditorMode('live')}><MDXPreview mdxContent={noteContent} onLineClick={handleLineClick} /></div>
+            )}
+          </>
+        )}
       </div>
     </div>
   ) : (
@@ -384,9 +555,29 @@ export default function App() {
   } else if (view === 'plugins') {
     mainContent = <PluginsPage onOpenSidePanel={() => setRightPanelOpen(true)} onOpenBottomPanel={() => setBottomPanelOpen(true)} />;
   } else if (view === 'settings') {
-    mainContent = <SettingsPage appearance={appearance} onAppearanceChange={handleAppearanceChange} />;
-  } else if (view === 'graph') {
-    mainContent = <SearchAndGraph notesData={notesData} onSelectNote={handleSelectNote} selectedNote={selectedNote} />;
+    mainContent = <SettingsPage appearance={appearance} onAppearanceChange={handleAppearanceChange} bindings={bindings} onBindingsChange={updateBindings} />;
+  } else if (view === 'gallery') {
+    mainContent = <ComponentGallery />;
+  } else if (shellConfig && !Surface && !browsing) {
+    // Shell handles plain notes in its editor slot; surface files (.vw) and
+    // browser tabs are full-page documents, so let them fall through to notesView.
+    mainContent = (
+      <div className="flex h-full w-full flex-col">
+        {editorHeader}
+        <div className="min-h-0 flex-1">
+          <LayoutSurface
+            path={SHELL_CONFIG}
+            content={shellConfig}
+            notesData={notesData}
+            onSelectNote={handleSelectNote}
+            selectedNote={selectedNote}
+            noteContent={noteContent}
+            onChangeNote={handleContentChange}
+            colorScheme={PRESETS[appearance.preset]?.colorScheme ?? 'dark'}
+          />
+        </div>
+      </div>
+    );
   } else {
     mainContent = notesView;
   }
@@ -417,51 +608,71 @@ export default function App() {
           ) : !repository ? (
             <RepositoryOnboarding recents={recents} onCreate={createRepository} onOpen={openRepository} onSwitch={switchRepository} />
           ) : (
-            <div className="flex min-h-0 overflow-hidden">
+            <PanelGroup direction="horizontal" autoSaveId="neuron.shell.h" className="flex min-h-0 overflow-hidden">
               {sidebarOpen && (
-                <div className="w-[264px] shrink-0">
-                  <Sidebar
-                    notes={filteredNotes}
-                    selectedNote={selectedNote}
-                    onSelectNote={handleSelectNote}
-                    onDeleteNote={handleDeleteNote}
-                    onRequestCreate={requestCreate}
-                    view={view}
-                    onNavigate={setView}
-                    repositoryName={repository.name}
-                    tags={tags}
-                    onSelectTag={setSelectedTag}
-                    selectedTag={selectedTag}
-                  />
-                </div>
+                <>
+                  <Panel id="sidebar" order={1} defaultSize={18} minSize={12} maxSize={40} className="min-w-0">
+                    <Sidebar
+                      notes={filteredNotes}
+                      selectedNote={selectedNote}
+                      onSelectNote={handleSelectNote}
+                      onDeleteNote={handleDeleteNote}
+                      onRequestCreate={requestCreate}
+                      view={view}
+                      onNavigate={setView}
+                      repositoryName={repository.name}
+                      tags={tags}
+                      onSelectTag={setSelectedTag}
+                      selectedTag={selectedTag}
+                    />
+                  </Panel>
+                  <PanelResizeHandle className="resize-handle resize-handle-v" />
+                </>
               )}
 
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                <div className="flex min-h-0 min-w-0 flex-1">
-                  <main className="canvas-surface relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
-                    {notice && (
-                      <div role="alert" className="surface-danger absolute left-1/2 top-3 z-50 flex max-w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 items-center gap-3 rounded-md border px-3 py-2 text-xs text-[var(--ink)] shadow-lg">
-                        <span>{notice}</span>
-                        <button className="interactive min-h-[28px] text-[var(--danger)] hover:text-[var(--ink)]" onClick={() => setNotice(null)}>Dismiss</button>
-                      </div>
-                    )}
-                    {mainContent}
-                  </main>
-
-                  {rightPanelOpen && (
-                    <div className="w-[340px] shrink-0">
-                      <RightPanel location="side" onOpenMarketplace={() => setView('plugins')} onClose={() => setRightPanelOpen(false)} />
-                    </div>
+              <Panel id="center" order={2} minSize={30} className="min-w-0">
+                <PanelGroup direction="vertical" autoSaveId="neuron.shell.v" className="flex min-h-0 flex-col">
+                  <Panel id="center-row" order={1} minSize={30} className="min-h-0">
+                    <PanelGroup direction="horizontal" autoSaveId="neuron.center.h" className="flex min-h-0">
+                      <Panel id="main" order={1} minSize={30} className="min-w-0">
+                        <main className="canvas-surface relative flex h-full w-full min-w-0 flex-col overflow-hidden">
+                          {notice && (
+                            <div role="alert" className="surface-danger absolute left-1/2 top-3 z-50 flex max-w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 items-center gap-3 rounded-md border px-3 py-2 text-xs text-[var(--ink)] shadow-lg">
+                              <span>{notice}</span>
+                              <button className="interactive min-h-[28px] text-[var(--danger)] hover:text-[var(--ink)]" onClick={() => setNotice(null)}>Dismiss</button>
+                            </div>
+                          )}
+                          {pendingShellConfig && (
+                            <div role="status" className="surface-danger absolute left-1/2 top-3 z-50 flex max-w-[min(40rem,calc(100%-2rem))] -translate-x-1/2 items-center gap-3 rounded-md border px-3 py-2 text-xs text-[var(--ink)] shadow-lg">
+                              <span>The workspace layout (.neuron/layout.json) changed. Update to the latest view?</span>
+                              <button className="interactive min-h-[28px] rounded px-2 font-medium text-[var(--accent-strong)] hover:bg-[var(--surface-hover)]" onClick={() => { setShellConfig(pendingShellConfig); setPendingShellConfig(null); setView('notes'); }}>Update view</button>
+                              <button className="interactive min-h-[28px] rounded px-2 text-[var(--ink-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--ink)]" onClick={() => setPendingShellConfig(null)}>Not now</button>
+                            </div>
+                          )}
+                          {mainContent}
+                        </main>
+                      </Panel>
+                      {rightPanelOpen && (
+                        <>
+                          <PanelResizeHandle className="resize-handle resize-handle-v" />
+                          <Panel id="right" order={2} defaultSize={26} minSize={15} maxSize={50} className="min-w-0">
+                            <RightPanel location="side" onOpenMarketplace={() => setView('plugins')} onClose={() => setRightPanelOpen(false)} />
+                          </Panel>
+                        </>
+                      )}
+                    </PanelGroup>
+                  </Panel>
+                  {bottomPanelOpen && (
+                    <>
+                      <PanelResizeHandle className="resize-handle resize-handle-h" />
+                      <Panel id="bottom" order={2} defaultSize={28} minSize={12} maxSize={70} className="min-h-0">
+                        <RightPanel location="bottom" onOpenMarketplace={() => setView('plugins')} onClose={() => setBottomPanelOpen(false)} />
+                      </Panel>
+                    </>
                   )}
-                </div>
-
-                {bottomPanelOpen && (
-                  <div className="h-[260px] min-h-[160px] shrink-0">
-                    <RightPanel location="bottom" onOpenMarketplace={() => setView('plugins')} onClose={() => setBottomPanelOpen(false)} />
-                  </div>
-                )}
-              </div>
-            </div>
+                </PanelGroup>
+              </Panel>
+            </PanelGroup>
           )}
 
           <StatusBar repositoryName={repository?.name ?? null} activeNote={view === 'notes' ? selectedNote : null} saveState={saveState} />
@@ -480,10 +691,15 @@ export default function App() {
           onOpenChange={setPaletteOpen}
           notes={notes}
           onSelectNote={handleSelectNote}
-          onOpenGraph={() => setView('graph')}
           onOpenMarketplace={() => setView('plugins')}
           onOpenSettings={() => setView('settings')}
           onCreate={() => requestCreate()}
+          onCreateSurface={createSurfaceFile}
+          onOpenWebsite={openWebsite}
+          onOpenGallery={() => setView('gallery')}
+          onToggleShell={toggleShell}
+          shellActive={!!shellConfig}
+          onImportChromeLogins={importChromeLogins}
         />
       </TooltipProvider>
     </PluginProvider>
