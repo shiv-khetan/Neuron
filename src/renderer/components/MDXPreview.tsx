@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { AlertCircle } from 'lucide-react';
-import { Counter, Badge, Callout, parseSemanticType } from './mdx-components';
+import { Badge, Callout, parseSemanticType } from './mdx-components';
 
 interface MDXPreviewProps {
   mdxContent: string;
@@ -184,7 +184,7 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
       }
 
       // Check if line contains custom JSX tag blocks
-      const isJSXBlock = line.trim().startsWith('<') && (line.trim().endsWith('/>') || line.trim().includes('</') || line.trim().includes('>') || line.trim().startsWith('<Counter') || line.trim().startsWith('<Badge') || line.trim().startsWith('<Callout'));
+      const isJSXBlock = line.trim().startsWith('<') && (line.trim().endsWith('/>') || line.trim().includes('</') || line.trim().includes('>') || line.trim().startsWith('<Badge') || line.trim().startsWith('<Callout'));
 
       if (isJSXBlock) {
         const startLine = i;
@@ -266,12 +266,7 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
   // Evaluates string to map dynamically into custom React elements
   function evaluateJSX(jsxStr: string, index: number): React.ReactNode {
     try {
-      // 1. Match Counter
-      if (jsxStr.startsWith('<Counter')) {
-        return <Counter key={`counter-${index}`} />;
-      }
-
-      // 2. Match Badge
+      // 1. Match Badge
       if (jsxStr.startsWith('<Badge')) {
         const textMatch = jsxStr.match(/text="([^"]+)"/);
         const typeMatch = jsxStr.match(/type="([^"]+)"/);
@@ -280,7 +275,7 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
         return <Badge key={`badge-${index}`} text={text} type={type} />;
       }
 
-      // 3. Match Callout
+      // 2. Match Callout
       if (jsxStr.startsWith('<Callout')) {
         const typeMatch = jsxStr.match(/type="([^"]+)"/);
         const titleMatch = jsxStr.match(/title="([^"]+)"/);
@@ -314,7 +309,7 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
 
       const err = new Error(`Component "<${tagName} />" is not registered in Neuron.`) as MDXParseError;
       err.block = jsxStr;
-      err.remediation = `Register component "${tagName}" in src/renderer/components/MDXPreview.tsx or use supported components: <Counter />, <Badge />, and <Callout />.`;
+      err.remediation = `Register component "${tagName}" in src/renderer/components/MDXPreview.tsx or use supported components: <Badge /> and <Callout />.`;
       throw err;
 
     } catch (caughtError: unknown) {

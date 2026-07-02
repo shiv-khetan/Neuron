@@ -1,4 +1,4 @@
-import { RotateCcw, Settings2, SwatchBook } from 'lucide-react';
+import { Keyboard, RotateCcw, Settings2, SwatchBook } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import {
@@ -7,10 +7,71 @@ import {
   readVarHex,
   type Appearance,
 } from '../lib/theme';
+import { DEFAULT_BINDINGS, KEY_ACTIONS, eventToChord, formatChord, type Bindings } from '../lib/keybindings';
 
 interface SettingsPageProps {
   appearance: Appearance;
   onAppearanceChange: (appearance: Appearance) => void;
+  bindings: Bindings;
+  onBindingsChange: (bindings: Bindings) => void;
+}
+
+function KeybindingsSection({ bindings, onBindingsChange }: { bindings: Bindings; onBindingsChange: (b: Bindings) => void }) {
+  const [capturing, setCapturing] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!capturing) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopImmediatePropagation(); // don't let the captured combo also fire its action
+      if (e.key === 'Escape') { setCapturing(null); return; }
+      const chord = eventToChord(e);
+      if (!chord) return; // wait for a non-modifier key
+      onBindingsChange({ ...bindings, [capturing]: chord });
+      setCapturing(null);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [capturing, bindings, onBindingsChange]);
+
+  const isDefault = JSON.stringify(bindings) === JSON.stringify(DEFAULT_BINDINGS);
+
+  return (
+    <section aria-labelledby="keys-heading" className="border-t border-[var(--divider)] pt-8">
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="flex items-start gap-2">
+          <Keyboard className="mt-0.5 h-4 w-4 text-[var(--accent-strong)]" />
+          <div>
+            <h2 id="keys-heading" className="text-sm font-semibold text-[var(--ink)]">Keyboard shortcuts</h2>
+            <p className="mt-0.5 text-xs leading-5 text-[var(--ink-muted)]">Click a shortcut, then press the new key combination. Esc cancels.</p>
+          </div>
+        </div>
+        <Button type="button" variant="outline" size="sm" disabled={isDefault} onClick={() => onBindingsChange({ ...DEFAULT_BINDINGS })}>
+          <RotateCcw className="h-3.5 w-3.5" /> Reset to defaults
+        </Button>
+      </div>
+
+      <div className="divide-y divide-[var(--divider)] border-y border-[var(--divider)]">
+        {KEY_ACTIONS.map((action) => (
+          <div key={action.id} className="grid min-h-[48px] grid-cols-[1fr_auto] items-center gap-4 py-2">
+            <span className="text-sm text-[var(--ink-secondary)]">{action.label}</span>
+            <button
+              type="button"
+              onClick={() => setCapturing(action.id)}
+              className={cn(
+                'interactive min-w-[7rem] rounded-md border px-3 py-1.5 text-center font-mono text-xs',
+                capturing === action.id
+                  ? 'border-[var(--accent)] bg-[color-mix(in_oklch,var(--accent)_12%,var(--surface))] text-[var(--accent-strong)]'
+                  : 'border-[var(--divider)] bg-[var(--surface)] text-[var(--ink)] hover:bg-[var(--surface-hover)]',
+              )}
+            >
+              {capturing === action.id ? 'Press keys…' : formatChord(bindings[action.id] ?? action.default)}
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function ThemeSwatches({ presetId }: { presetId: string }) {
@@ -23,7 +84,7 @@ function ThemeSwatches({ presetId }: { presetId: string }) {
   );
 }
 
-export default function SettingsPage({ appearance, onAppearanceChange }: SettingsPageProps) {
+export default function SettingsPage({ appearance, onAppearanceChange, bindings, onBindingsChange }: SettingsPageProps) {
   const [resolvedColors, setResolvedColors] = useState<Record<string, string>>({});
 
   useLayoutEffect(() => {
@@ -133,8 +194,10 @@ export default function SettingsPage({ appearance, onAppearanceChange }: Setting
             })}
           </div>
         </section>
+
+        <KeybindingsSection bindings={bindings} onBindingsChange={onBindingsChange} />
       </div>
     </div>
   );
 }
-import { useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';

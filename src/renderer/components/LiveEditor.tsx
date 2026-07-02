@@ -9,7 +9,7 @@ import { StateField } from '@codemirror/state';
 import type { EditorState, Range } from '@codemirror/state';
 import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
-import { Counter, Badge, Callout, parseSemanticType, MarkdownTable, parseMarkdownTable } from './mdx-components';
+import { Badge, Callout, parseSemanticType, MarkdownTable, parseMarkdownTable } from './mdx-components';
 
 interface LiveEditorProps {
   value: string;
@@ -158,7 +158,7 @@ function overlaps(a: number, b: number, c: number, d: number) {
 }
 
 // Computed from the full document + selection. Block decorations (the Callout /
-// Counter widgets) MUST be provided from a StateField, not a ViewPlugin —
+// table widgets) MUST be provided from a StateField, not a ViewPlugin —
 // CodeMirror forbids plugins from emitting decorations that change block layout.
 function buildDecorations(state: EditorState): DecorationSet {
   const ranges: Range<Decoration>[] = [];
@@ -200,7 +200,6 @@ function buildDecorations(state: EditorState): DecorationSet {
     }
   };
 
-  blockComponent(/<Counter\s*\/>/g, () => <Counter />);
   blockComponent(/<Callout\b[^>]*>[\s\S]*?<\/Callout>/g, (m) => {
     const type = parseSemanticType(m.match(/type="([^"]*)"/)?.[1]);
     const title = m.match(/title="([^"]*)"/)?.[1];

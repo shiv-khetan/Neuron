@@ -1,28 +1,9 @@
-import { useState } from 'react';
-import { AlertCircle, Plus, Minus, Info, CheckCircle, AlertTriangle } from 'lucide-react';
+import { AlertCircle, Info, CheckCircle, AlertTriangle } from 'lucide-react';
 
 export type SemanticType = 'success' | 'warning' | 'error' | 'info';
 
 export function parseSemanticType(value: string | undefined): SemanticType {
   return value === 'success' || value === 'warning' || value === 'error' ? value : 'info';
-}
-
-export function Counter() {
-  const [count, setCount] = useState(0);
-  return (
-    <div className="callout my-5 flex max-w-xs flex-col items-center space-y-3 p-4 font-sans">
-      <span className="text-xs font-medium text-secondary">Interactive counter</span>
-      <div className="font-mono text-3xl font-semibold tabular-nums text-accent">{count}</div>
-      <div className="flex space-x-2">
-        <button onClick={() => setCount(count - 1)} className="interactive rounded-md border divider-color p-1.5 text-primary hover:bg-[var(--surface-hover)]" aria-label="Decrease counter">
-          <Minus className="h-4 w-4" />
-        </button>
-        <button onClick={() => setCount(count + 1)} className="interactive rounded-md bg-accent p-1.5" aria-label="Increase counter">
-          <Plus className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
-  );
 }
 
 interface BadgeProps {

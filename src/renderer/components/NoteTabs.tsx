@@ -1,4 +1,4 @@
-import { FileCode2, Plus, X } from 'lucide-react';
+import { FileCode2, Globe, Plus, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface NoteTabsProps {
@@ -7,13 +7,19 @@ interface NoteTabsProps {
   onSelect: (note: string) => void;
   onClose: (note: string) => void;
   onCreate: () => void;
+  onNewBrowser: () => void;
 }
 
+const isUrl = (s: string) => /^https?:\/\//.test(s);
+
 function noteLabel(path: string) {
+  if (isUrl(path)) {
+    try { return new URL(path).hostname.replace(/^www\./, ''); } catch { return path; }
+  }
   return path.split('/').pop()?.replace(/\.(md|mdx)$/, '') ?? path;
 }
 
-export default function NoteTabs({ tabs, activeTab, onSelect, onClose, onCreate }: NoteTabsProps) {
+export default function NoteTabs({ tabs, activeTab, onSelect, onClose, onCreate, onNewBrowser }: NoteTabsProps) {
   return (
     <nav aria-label="Open notes" className="flex h-full min-w-0 flex-1 items-stretch overflow-x-auto">
       {tabs.map((note) => {
@@ -34,7 +40,9 @@ export default function NoteTabs({ tabs, activeTab, onSelect, onClose, onCreate 
               onClick={() => onSelect(note)}
               onAuxClick={(event) => { if (event.button === 1) onClose(note); }}
             >
-              <FileCode2 className={cn('h-3.5 w-3.5 shrink-0', active && 'text-[var(--accent-strong)]')} />
+              {isUrl(note)
+                ? <Globe className={cn('h-3.5 w-3.5 shrink-0', active && 'text-[var(--accent-strong)]')} />
+                : <FileCode2 className={cn('h-3.5 w-3.5 shrink-0', active && 'text-[var(--accent-strong)]')} />}
               <span className="truncate font-mono">{noteLabel(note)}</span>
             </button>
             <button
@@ -60,6 +68,15 @@ export default function NoteTabs({ tabs, activeTab, onSelect, onClose, onCreate 
         onClick={onCreate}
       >
         <Plus className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        aria-label="Open website tab"
+        title="Open website tab"
+        className="interactive grid h-full w-10 shrink-0 place-items-center text-[var(--ink-muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)]"
+        onClick={onNewBrowser}
+      >
+        <Globe className="h-4 w-4" />
       </button>
     </nav>
   );
