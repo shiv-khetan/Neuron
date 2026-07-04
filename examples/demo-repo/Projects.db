@@ -1,0 +1,36 @@
+{
+  "schema": {
+    "order": ["name", "status", "tags", "due", "done", "link"],
+    "properties": {
+      "name": { "name": "Project", "type": "text" },
+      "status": {
+        "name": "Status",
+        "type": "select",
+        "options": [
+          { "id": "todo", "name": "Todo", "color": "#8b8b8b" },
+          { "id": "doing", "name": "In progress", "color": "#528fd1" },
+          { "id": "shipped", "name": "Shipped", "color": "#5aa06c" }
+        ]
+      },
+      "tags": {
+        "name": "Tags",
+        "type": "multiselect",
+        "options": [
+          { "id": "ui", "name": "ui", "color": "#9a6dd7" },
+          { "id": "infra", "name": "infra", "color": "#e28f44" },
+          { "id": "docs", "name": "docs", "color": "#d9b23c" }
+        ]
+      },
+      "due": { "name": "Due", "type": "date" },
+      "done": { "name": "Done", "type": "checkbox" },
+      "link": { "name": "Link", "type": "url" }
+    }
+  },
+  "view": { "sortBy": "due", "sortDir": "asc" },
+  "rows": [
+    { "id": "r1", "values": { "name": "Database surface", "status": "shipped", "tags": ["ui"], "due": "2026-07-04", "done": true } },
+    { "id": "r2", "values": { "name": "Workspace rebrand", "status": "shipped", "tags": ["ui", "docs"], "due": "2026-07-05", "done": true } },
+    { "id": "r3", "values": { "name": "Gallery & list views", "status": "doing", "tags": ["ui"], "due": "2026-07-12", "done": false } },
+    { "id": "r4", "values": { "name": "Release notes", "status": "todo", "tags": ["docs"], "due": "2026-07-20", "done": false, "link": "https://github.com" } }
+  ]
+}
