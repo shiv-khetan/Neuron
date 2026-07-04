@@ -1,0 +1,30 @@
+# Monitoring runbook
+
+Use this runbook with [[Dashboard (default)]]. It is intentionally local and repeatable:
+the command block lists checks, the daily note records findings, and wiki-links
+keep related notes close.
+
+## Triage order
+
+1. Confirm the active workspace opens and notes render.
+2. Run `npm run build` before any package test.
+3. Run `npm run dist:test` and install **Neuron Test** locally.
+4. Record blockers in the daily note before changing production release notes.
+5. Publish only from the production command: `npm run release`.
+
+## Escalation rules
+
+| Condition | Action |
+| --- | --- |
+| Build fails | Fix before packaging |
+| Test installer fails to launch | Keep it in test; do not publish |
+| Data loss risk | Stop and document reproduction steps |
+| Cosmetic dashboard issue | Log it, then continue if core flows pass |
+
+## Related notes
+
+- [[2026-06-19]]
+- [[building-uis-and-dashboards]]
+- [[plugins-and-ai]]
+
+#runbook #daily-monitor #release-check

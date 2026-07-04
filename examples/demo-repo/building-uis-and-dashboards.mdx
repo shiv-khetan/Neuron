@@ -1,0 +1,144 @@
+# Building UIs & dashboards
+
+Neuron is two things at once: a place to *write*, and a place to *assemble*.
+Notes hold prose and MDX components. `.vw` files hold live blocks that can read
+local workspace sources and run trusted actions.
+
+<Callout type="info" title="Two layers of UI">
+**In a note** you drop components such as badges, callouts, tables, and tasks into prose.
+**In a view** you compose blocks: metrics, file counts, charts, tables, checklists, and buttons.
+</Callout>
+
+## 1. Components you can drop into any note
+
+These render live in the preview. See [[mdx-components]] for the full set.
+
+<Badge type="success" text="shipped" />
+<Badge type="info" text="in review" />
+<Badge type="warning" text="blocked" />
+
+<Callout type="success" title="Local-first">
+Every keystroke is saved to disk. No save button, no cloud round-trip.
+</Callout>
+
+A plain Markdown table renders too:
+
+| Signal | Today | Trend |
+| --- | :--: | --- |
+| Notes edited | 4 | up |
+| Links added | 7 | up |
+| Open tasks | 2 | down |
+
+## 2. Tags you can compose in a `.vw` view
+
+A `.vw` file is **HTML with Tailwind classes**. Standard tags (`<div>`, `<h2>`,
+`<p>`, `<ul>`) render as themselves; layout uses Tailwind utilities like
+`grid grid-cols-3 gap-4` and `flex`. A handful of custom tags pull in live data
+and styled blocks:
+
+| Tag | What it shows |
+| --- | --- |
+| `<metric title value hint>` | A hand-curated status, count, or value |
+| `<filecount glob>` | A live count of workspace files |
+| `<filegraph glob>` | A chart of files by type |
+| `<filetable limit>` | A table of workspace file metadata |
+| `<csvtable src>` / `<database src>` | An **editable** Notion-style database from a CSV — edit cells, add/delete rows, add columns, all saved back to the file |
+| `<card title>…</card>` | A titled block wrapper |
+| `<task checked>…</task>` | A checklist row |
+| `<progress label value max>` | A labeled progress bar with % complete |
+| `<stat label value delta sub>` | A metric tile with a colored up/down delta |
+| `<barchart>` / `<linechart>` / `<areachart>` | Charts from a CSV (`src x y`) or inline `data` JSON |
+| `<heatmap src date value>` | A GitHub-style habit/contribution grid |
+| `<bookmark url title description>` / `<linkpreview>` | A link card with the site's favicon |
+| `<gallery glob>` | A grid of images stored in the workspace |
+| `<listview glob limit>` | A clickable file list — notes open in the editor |
+| `<folderview path>` | Files grouped by folder, each note clickable |
+| `<button label action>` | A trusted action (`openInVSCode`, `reveal`, `open`, `createFile`) |
+| `<button label automation>` | Runs a saved automation by name on click |
+
+Every view tag accepts a `class` attribute for **grid placement** — put the tag
+directly inside a grid and size it with `col-span-*` / `row-span-*`:
+
+```html
+<div class="grid grid-cols-2 lg:grid-cols-12 gap-4">
+  <filecount class="lg:col-span-3" glob="*.mdx" />
+  <barchart class="col-span-2 lg:col-span-9" src="data/habits.csv" x="date" y="count" />
+</div>
+```
+
+Prefer this bento pattern over stacking blocks vertically — dashboards read
+better as a 2D composition with one wide anchor block per row.
+
+Basic file-system actions for buttons: `action="open" path="note.mdx"` opens a
+note, and `action="createFile" path="scratch.md" content="# Hi"` creates the
+file if it doesn't exist, then opens it.
+
+## 3. `.db` databases — fully custom, Notion-style
+
+A `.db` file is a self-contained database: one JSON document holding the
+property schema, select/multi-select options with tag colors, the persisted
+view state (sort + filter), and the rows. Open [[Projects]] to try it.
+
+Everything is customizable at runtime from the table itself:
+
+- **Add / rename / retype / reorder / delete properties** — hover a column
+  header for sort and settings; property types are text, number, checkbox,
+  date, URL, select, and multi-select.
+- **Select options** — add, rename, reorder, recolor (click the color dot),
+  and delete option tags; deleting an option cleans it out of every row.
+- **Filter and search** — a live search box plus a per-property filter;
+  sort and filter persist in the file, search is ephemeral.
+- **Three layouts** — switch between **Table**, **Board** (kanban grouped by
+  any Select property — drag cards between columns to update them), and
+  **Cards** (gallery). The chosen layout persists in the file.
+- **Everything saves to the file instantly** — edits are written atomically
+  to the `.db` JSON, and external changes (git pull, sync, another editor)
+  refresh the table live. No local storage, no hidden state.
+
+Create one with a button — `<button label="New database" action="createFile" path="Tracker.db" />`
+— then click **Initialize database** for a starter schema.
+
+## 4. `.canvas` boards — spatial thinking
+
+A `.canvas` file is an infinite whiteboard in the open [JSON Canvas](https://jsoncanvas.org)
+format (the same one Obsidian uses, so boards travel both ways). Open
+[[Idea board]] to try it:
+
+- **Double-click** empty space for a text card; double-click a card to write.
+- **Drag** cards to move, drag the corner to resize, drag the background to pan,
+  scroll to zoom, and use the fit button to frame everything.
+- **Connect** cards by dragging from the dots on a card's edge; click a
+  connection to select it, label it, color it, or delete it.
+- **Groups** are labelled regions — moving a group carries everything inside.
+- **Note and link cards** put live windows to workspace files and websites on
+  the board; a text card can be converted into a permanent note in one click.
+- Everything saves straight to the `.canvas` JSON; external edits appear live.
+
+See [[Habit tracker]] for a dashboard using progress, stats, charts, and a heatmap.
+
+### The view shape
+
+```html
+<h1>Workspace view</h1>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <metric title="Release lane" value="Test" />
+  <filecount title="MDX notes" glob="*.mdx" />
+  <filegraph title="Files by type" />
+</div>
+
+<csvtable title="Tasks" src="data/tasks.csv" />
+
+<div class="flex gap-3">
+  <button label="Open repo in VS Code" action="openInVSCode" />
+</div>
+```
+
+Open [[Workspace view]] for a full example, and [[Task manager]] for a CSV-backed
+task board.
+
+Open [[Dashboard (default)]] and [[Dashboard (custom)]] for a side-by-side pair:
+both read the same `data/tasks.csv` and `data/habits.csv`, but one composes the
+standard blocks as-is while the other wraps them in a fully custom HTML +
+Tailwind layout. Edit a task in either one and the other updates live.
+
+#guide #dashboards #components #views

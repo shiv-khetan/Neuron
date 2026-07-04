@@ -1,15 +1,43 @@
-# 2026-06-19
+# 2026-06-19 Daily monitor
 
-A sample daily note. Enable the **Daily Notes** plugin (see [[plugins-and-ai]]) and use "Open today's daily note" to create one of these for the current date.
+A sample daily operations note for [[Dashboard (default)]]. Open the dashboard note, review
+the status strip, and use this note for the detailed daily checks.
 
-## Today
+<Callout type="info" title="Dashboard loop">
+Scan the checklist, update the incident table, run the terminal checks, then
+follow graph links into the notes that explain the signal.
+</Callout>
 
-- Toured the demo repository
-- Tried the Counter and Callout components in [[mdx-components]]
-- Mapped note links in the Graph tab
+## Morning checks
+
+- [x] Review overnight errors in the app log
+- [x] Confirm the demo workspace opens from a clean profile
+- [ ] Verify the packaged **Neuron Test** installer before release
+- [ ] Check [[daily/monitoring-runbook]] before escalating any warning
+
+## Signals
+
+| Signal | Current | Threshold | Status |
+| --- | ---: | ---: | --- |
+| Failed note saves | 0 | 1 | <Badge type="success" text="clear" /> |
+| Renderer reloads | 1 | 3 | <Badge type="info" text="watch" /> |
+| Plugin errors | 0 | 1 | <Badge type="success" text="clear" /> |
+| Open release blockers | 2 | 0 | <Badge type="warning" text="review" /> |
+
+## Terminal checks
+
+Run these from the dashboard terminal:
+
+```powershell
+npm run build
+npm run dist:test
+Get-ChildItem release\test
+```
 
 ## Notes
 
-The daily section keeps these in `daily/` so they stay out of your main note list.
+- Link release issues back to [[building-uis-and-dashboards]] when they affect a dashboard panel.
+- Keep local test-only findings out of production release notes until the issue is confirmed.
+- Use #daily-monitor for operational notes and #release-check for packaging checks.
 
-#daily #journal
+#daily #journal #daily-monitor #release-check
