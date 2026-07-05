@@ -1491,9 +1491,10 @@
                </a>`).join('');
           }
 
-          // Point the hero button straight at the visitor's installer.
+          // Point the hero button straight at the visitor's installer
+          // (prefer the real installer over portable builds).
           if (visitorOS && byOS[visitorOS].length > 0) {
-            const best = byOS[visitorOS][0];
+            const best = byOS[visitorOS].find((a) => !/portable/i.test(a.name)) ?? byOS[visitorOS][0];
             const btn = document.getElementById('primary-download');
             btn.href = best.browser_download_url;
             document.getElementById('primary-download-label').textContent =
