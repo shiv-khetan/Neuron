@@ -18,7 +18,17 @@ The React renderer owns workspace state, navigation, note tabs, CodeMirror editi
 
 ## Notes and repositories
 
-A repository is an ordinary folder. Neuron scans `.md` and `.mdx` files, stores paths relative to the selected repository, and writes note text without converting the document into a proprietary format. Chokidar reports external changes back to the renderer.
+A repository is an ordinary folder. Neuron scans `.md`, `.mdx`, and `.vw` files, stores paths relative to the selected repository, and writes text without converting the document into a proprietary format. Chokidar reports external changes back to the renderer.
+
+## File-driven surfaces
+
+`.vw` files are small JSON *declarations*, not stored render output. Opening one renders a block view instead of the Markdown editor. `src/renderer/surfaces/` holds the registry: `getSurface(path)` maps the `.vw` extension to `ViewSurface`. View blocks can render static text and metrics, fetch local repository sources for file counts and tables, draw charts, show checklists, and run trusted named actions such as opening the active repository in VS Code.
+
+`neuron.config` is still supported as the internal workspace shell layout. It uses the same layout parser and panel renderers, but it is not a public surface extension.
+
+## Terminal and automations
+
+The main process spawns interactive PTYs with `node-pty` (`terminal:spawn/write/resize/kill`, streamed over `terminal:data`); the renderer renders them with xterm.js (`components/XtermTerminal.tsx`). node-pty ships ABI-stable N-API prebuilds, so packaging sets `npmRebuild: false` and unpacks it from the asar. Automations are named command sequences stored in settings and run one-shot through the existing `terminal:run` bridge.
 
 ## Settings
 

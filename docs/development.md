@@ -23,6 +23,18 @@ The command starts three coordinated processes:
 
 Stop the parent command to stop all three processes.
 
+## Build environments
+
+Neuron has three build environments:
+
+| Environment | Command | Purpose |
+| --- | --- | --- |
+| Development | `npm run dev` | Runs the app from Vite and watched TypeScript output. |
+| Test | `npm run dist:test` | Creates a local beta installer named **Neuron Test**. It runs like production, but uses a separate app id and does not publish or check production updates. |
+| Production | `npm run release` | Creates the final **Neuron** installer and publishes it to GitHub Releases. |
+
+Every build command starts by clearing `dist/` and `release/`, so the generated folders only contain the latest build output.
+
 ## Quality checks
 
 ```bash
@@ -41,7 +53,7 @@ Before a release, also run `npm run dist:dir` and open the unpacked application.
 - Plugin contracts: `src/renderer/plugins/types.ts`
 - Built-in plugins: `src/renderer/plugins/builtin/`
 - Demo content: `examples/demo-repo/`
-- Packaging configuration: `package.json#build`
+- Packaging configuration: `tools/electron-builder.env.cjs`
 
 ## Adding dependencies
 

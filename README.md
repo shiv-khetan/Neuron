@@ -18,16 +18,18 @@
 
 ## Why Neuron?
 
-Neuron treats your notes as durable files, not records trapped in a hosted database. Open any folder of `.md` or `.mdx` documents and work with it as a focused desktop knowledge base. Your repository can stay offline, live in Git, or sync through a folder service you already use.
+Neuron treats your notes as durable files, not records trapped in a hosted database. Open any folder of `.md` or `.mdx` documents and work with it as a focused desktop knowledge base — that folder is your workspace. It can stay offline, live in Git, or sync through a folder service you already use (OneDrive, Google Drive, Dropbox). You can keep several workspaces and switch between them from the title bar.
 
 ### Highlights
 
 - Live Markdown editing with source, split-preview, and reading modes.
 - Multiple note tabs, task checkboxes, tables, code blocks, wiki-links, and tags.
-- Repository graph and search for navigating connected notes.
+- Resizable, VS Code-style docks — drag any divider; layout persists.
+- File-driven `.vw` block views for live metrics, file tables, charts, checklists, and trusted action buttons.
+- Notion-style `.db` databases — typed properties, colored select tags, filtering and sorting — stored as plain JSON in the workspace with atomic writes and live reload on external changes.
 - Built-in plugin host with commands, MDX components, side peeks, and bottom peeks.
 - Optional AI integrations for OpenAI, Anthropic, Gemini, OpenRouter, and local endpoints.
-- Integrated terminal plugin for repository-aware command-line work.
+- Full interactive terminal (PTY) and saved command automations for workspace-aware command-line work.
 - Graphite, Void, Nord, and Light themes with configurable Markdown colors.
 - Local settings and ordinary files; no Neuron account or hosted backend required.
 
@@ -63,18 +65,18 @@ npm run dev
 ### Build commands
 
 ```bash
-npm run build          # Compile the Electron and React applications
-npm run dist:dir       # Create an unpacked app for local inspection
-npm run dist           # Build installers for the current operating system
+npm run build          # Clean previous output, then compile main + renderer
+npm run dist:test      # Create a local beta installer named Neuron Test
+npm run release        # Build and publish the production NSIS installer
 npm run icon:generate  # Regenerate build/icon.png from build/icon.svg
 ```
 
-Generated output is written to `dist/` and `release/`; both directories are ignored by Git.
+Generated output is written to `dist/` and `release/`; both directories are cleared at the start of each build and ignored by Git. Test installers go to `release/test/` and production installers go to `release/prod/`.
 
 ## Data and privacy
 
 - Notes remain in the folder you choose.
-- Neuron does not upload repositories or require an account.
+- Neuron does not upload workspaces or require an account.
 - Network requests occur only when you explicitly use a network-backed plugin.
 - Plugin credentials and settings are stored in Electron's local user-data directory.
 - The renderer runs with context isolation enabled and Node integration disabled.
@@ -112,7 +114,7 @@ Bug reports, documentation improvements, and focused pull requests are welcome. 
 
 ## Project status
 
-Neuron is under active development. Back up important notes and review release notes before upgrading. The file format is plain Markdown/MDX, so repositories remain usable without Neuron.
+Neuron is under active development. Back up important notes and review release notes before upgrading. The file format is plain Markdown/MDX, so workspaces remain usable without Neuron.
 
 ## License
 

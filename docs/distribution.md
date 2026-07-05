@@ -19,6 +19,14 @@ The CI workflow validates pushes and pull requests. The Pages workflow deploys `
 
 ## Publish a release
 
+Create and install a local beta first:
+
+```bash
+npm run dist:test
+```
+
+This writes a **Neuron Test** installer under `release/test/`. It uses the same packaged runtime path as production while keeping a separate app id, installer name, and user data from the final app.
+
 Update `package.json`, commit the version, and push a matching tag:
 
 ```bash
@@ -48,8 +56,9 @@ Never commit certificates, passwords, or base64-encoded signing material.
 ## Release checklist
 
 - Run `npm ci`, `npm audit`, `npm run build`, and `npm run dist:dir`.
-- Launch the unpacked app and test the demo repository.
+- Run `npm run dist:test`, install **Neuron Test**, and test the demo repository locally.
 - Confirm version numbers and release notes.
+- Run `npm run release` only when the build is ready to publish as production.
 - Push the tag and watch every matrix job.
 - Download-test each artifact from GitHub Releases.
 - Check the Pages download button.
