@@ -1,6 +1,6 @@
 {
   "name": "neuron",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Local-first Markdown and MDX knowledge workspace",
   "author": "Neuron contributors <contributors@neuron.notes>",
   "license": "MIT",
@@ -8,15 +8,20 @@
   "main": "dist/main/main.js",
   "type": "commonjs",
   "scripts": {
+    "clean:build": "node tools/clean-build.mjs",
     "dev:renderer": "vite",
     "dev:main": "tsc -w -p tsconfig.main.json",
     "dev": "concurrently -k -n \"renderer,main,electron\" -c \"blue,yellow,green\" \"npm run dev:renderer\" \"npm run dev:main\" \"node tools/dev/start-electron.js\"",
     "build:renderer": "vite build",
     "build:main": "tsc -p tsconfig.main.json",
-    "build": "npm run build:main && npm run build:renderer",
-    "dist": "npm run build && electron-builder",
-    "dist:dir": "npm run build && electron-builder --dir",
-    "icon:generate": "node tools/icons/generate-app-icon.js"
+    "build": "npm run clean:build && npm run build:main && npm run build:renderer",
+    "dist": "npm run dist:test",
+    "dist:test": "node tools/package-env.mjs test",
+    "dist:dir": "node tools/package-env.mjs test --dir",
+    "dist:store": "node tools/package-env.mjs prod --store",
+    "release": "node tools/package-env.mjs prod --publish",
+    "icon:generate": "node tools/icons/generate-app-icon.js",
+    "test:views": "node tools/view-security.test.mjs"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.2.5",
@@ -25,23 +30,57 @@
     "@codemirror/view": "^6.26.0",
     "@mdx-js/mdx": "^3.0.1",
     "@mdx-js/react": "^3.0.1",
-    "@radix-ui/react-dialog": "^1.1.1",
+    "@radix-ui/react-accordion": "^1.2.14",
+    "@radix-ui/react-alert-dialog": "^1.1.17",
+    "@radix-ui/react-aspect-ratio": "^1.1.10",
+    "@radix-ui/react-avatar": "^1.2.0",
+    "@radix-ui/react-checkbox": "^1.3.5",
+    "@radix-ui/react-collapsible": "^1.1.14",
+    "@radix-ui/react-context-menu": "^2.3.1",
+    "@radix-ui/react-dialog": "^1.1.17",
+    "@radix-ui/react-direction": "^1.1.2",
     "@radix-ui/react-dropdown-menu": "^2.1.1",
-    "@radix-ui/react-popover": "^1.1.1",
+    "@radix-ui/react-hover-card": "^1.1.17",
+    "@radix-ui/react-label": "^2.1.10",
+    "@radix-ui/react-menubar": "^1.1.18",
+    "@radix-ui/react-navigation-menu": "^1.2.16",
+    "@radix-ui/react-popover": "^1.1.17",
+    "@radix-ui/react-progress": "^1.1.10",
+    "@radix-ui/react-radio-group": "^1.4.1",
     "@radix-ui/react-scroll-area": "^1.1.0",
+    "@radix-ui/react-select": "^2.3.1",
+    "@radix-ui/react-separator": "^1.1.10",
+    "@radix-ui/react-slider": "^1.4.1",
+    "@radix-ui/react-slot": "^1.3.0",
     "@radix-ui/react-switch": "^1.1.0",
     "@radix-ui/react-tabs": "^1.1.0",
-    "@radix-ui/react-tooltip": "^1.1.2",
+    "@radix-ui/react-toggle": "^1.1.12",
+    "@radix-ui/react-toggle-group": "^1.1.13",
+    "@radix-ui/react-tooltip": "^1.2.10",
+    "@tanstack/react-table": "^8.21.3",
     "@uiw/react-codemirror": "^4.22.1",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "chokidar": "^3.6.0",
-    "class-variance-authority": "^0.7.0",
+    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
+    "date-fns": "^4.4.0",
+    "electron-updater": "^6.8.9",
+    "embla-carousel-react": "^8.6.0",
+    "input-otp": "^1.4.2",
     "lucide-react": "^0.395.0",
+    "next-themes": "^0.4.6",
+    "node-pty": "^1.1.0",
     "react": "^18.3.1",
+    "react-day-picker": "^10.0.1",
     "react-dom": "^18.3.1",
-    "react-resizable-panels": "^2.0.20",
-    "tailwind-merge": "^2.4.0"
+    "react-resizable-panels": "^2.1.9",
+    "recharts": "^2.15.4",
+    "sonner": "^2.0.7",
+    "sql.js": "^1.14.1",
+    "tailwind-merge": "^2.4.0",
+    "vaul": "^1.1.2"
   },
   "devDependencies": {
     "@types/node": "^20.14.2",
@@ -65,6 +104,11 @@
     "productName": "Neuron",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "asar": true,
+    "asarUnpack": [
+      "**/node_modules/node-pty/**",
+      "**/node_modules/sql.js/dist/sql-wasm.wasm"
+    ],
+    "npmRebuild": false,
     "directories": {
       "output": "release"
     },
@@ -89,7 +133,8 @@
       "icon": "build/icon.png",
       "target": [
         "nsis",
-        "portable"
+        "portable",
+        "appx"
       ]
     },
     "nsis": {
@@ -97,6 +142,20 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
+    },
+    "appx": {
+      "applicationId": "Neuron",
+      "displayName": "Neuron",
+      "identityName": "REPLACE.WITH.PartnerCenter.IdentityName",
+      "publisher": "CN=REPLACE-WITH-PARTNER-CENTER-PUBLISHER-ID",
+      "publisherDisplayName": "REPLACE_WITH_PUBLISHER_DISPLAY_NAME",
+      "backgroundColor": "#1a1a1a",
+      "languages": [
+        "en-US"
+      ]
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-${os}-${arch}-portable.${ext}"
     },
     "mac": {
       "icon": "build/icon.png",
