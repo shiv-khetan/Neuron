@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Neuron release notes and changelog." />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <title>Changelog — Neuron</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg-canvas: #070809;
+        --bg-surface: #0f1113;
+        --border-color: rgba(255, 255, 255, 0.08);
+        --border-color-muted: rgba(255, 255, 255, 0.04);
+        --text-primary: #f2f4f3;
+        --text-secondary: #b6bcb9;
+        --text-muted: #727976;
+        --accent: #91d59d;
+        --accent-rgb: 145, 213, 157;
+        --transition-bezier: cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      * { box-sizing: border-box; }
+
+      html { scroll-behavior: smooth; }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg-canvas);
+        color: var(--text-primary);
+        font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .shell {
+        width: min(820px, calc(100% - 48px));
+        margin: 0 auto;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 24px auto 0;
+        padding: 10px 24px;
+        height: 64px;
+        background: rgba(15, 17, 19, 0.7);
+        backdrop-filter: blur(12px);
+        border: 1px solid var(--border-color);
+        border-radius: 9999px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 15px;
+        font-weight: 600;
+        text-decoration: none;
+        color: var(--text-primary);
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        place-items: center;
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        background: var(--bg-surface);
+      }
+
+      .brand-mark img { width: 20px; height: 20px; }
+
+      nav { display: flex; gap: 20px; }
+
+      nav a {
+        font-size: 13px;
+        font-weight: 500;
+        text-decoration: none;
+        color: var(--text-secondary);
+        transition: color 200ms ease;
+      }
+
+      nav a:hover { color: var(--text-primary); }
+
+      main { padding: 72px 0 100px; }
+
+      .page-title {
+        margin: 0 0 8px;
+        font-size: clamp(32px, 5vw, 44px);
+        font-weight: 800;
+        letter-spacing: -0.03em;
+      }
+
+      .page-sub {
+        margin: 0 0 48px;
+        color: var(--text-secondary);
+        font-size: 15px;
+      }
+
+      .page-sub a { color: var(--accent); }
+
+      /* Rendered changelog */
+      #log { line-height: 1.65; }
+
+      #log .release {
+        position: relative;
+        padding: 28px 28px 20px;
+        margin-bottom: 24px;
+        background: rgba(255, 255, 255, 0.015);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+      }
+
+      #log h2 {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 0 0 4px;
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      #log h2 .version {
+        font-family: 'Geist Mono', monospace;
+        font-size: 13px;
+        color: var(--accent);
+        background: rgba(var(--accent-rgb), 0.08);
+        border: 1px solid rgba(var(--accent-rgb), 0.22);
+        border-radius: 9999px;
+        padding: 2px 12px;
+      }
+
+      #log h2 .date {
+        font-family: 'Geist Mono', monospace;
+        font-size: 12px;
+        font-weight: 400;
+        color: var(--text-muted);
+      }
+
+      #log h3 {
+        margin: 22px 0 8px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+      }
+
+      #log h3.kind-added { color: var(--accent); }
+      #log h3.kind-changed { color: #91b9d5; }
+      #log h3.kind-security { color: #f2c94c; }
+      #log h3.kind-fixed { color: #f28b82; }
+
+      #log ul { margin: 0; padding-left: 20px; color: var(--text-secondary); font-size: 14.5px; }
+      #log li { margin: 6px 0; }
+      #log li::marker { color: rgba(var(--accent-rgb), 0.6); }
+      #log p { color: var(--text-secondary); font-size: 14.5px; }
+      #log a { color: var(--accent); }
+      #log strong { color: var(--text-primary); font-weight: 600; }
+      #log code {
+        font-family: 'Geist Mono', monospace;
+        font-size: 0.88em;
+        color: var(--text-primary);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-color-muted);
+        border-radius: 5px;
+        padding: 1px 6px;
+      }
+
+      .loading, .fallback {
+        color: var(--text-muted);
+        font-size: 14px;
+        padding: 40px 0;
+      }
+
+      .fallback a { color: var(--accent); }
+
+      footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 32px 0 56px;
+        border-top: 1px solid var(--border-color);
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+
+      footer a { color: var(--text-secondary); text-decoration: none; }
+      footer a:hover { color: var(--text-primary); }
+
+      @media (max-width: 500px) {
+        header { padding: 10px 16px; }
+        nav { gap: 12px; }
+        #log .release { padding: 20px 18px 14px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header>
+        <a class="brand" href="./">
+          <span class="brand-mark" aria-hidden="true"><img src="./icon.svg" alt="" /></span>
+          Neuron
+        </a>
+        <nav aria-label="Project links">
+          <a href="./#download">Download</a>
+          <a data-repository href="#">Source</a>
+          <a data-releases href="#">Releases</a>
+        </nav>
+      </header>
+
+      <main>
+        <h1 class="page-title">Changelog</h1>
+        <p class="page-sub">Everything that changed, release by release. Straight from <a data-changelog-src href="#">CHANGELOG.md</a> in the repository.</p>
+        <div id="log"><p class="loading">Loading release notes…</p></div>
+      </main>
+
+      <footer>
+        <span>Neuron · Local-first knowledge workspace</span>
+        <a data-repository href="#">MIT licensed on GitHub</a>
+      </footer>
+    </div>
+
+    <script>
+      const owner = location.hostname.endsWith('.github.io') ? location.hostname.split('.')[0] : 'shiv-khetan';
+      const repository = location.pathname.split('/').filter(Boolean)[0] || 'Neuron';
+      const base = `https://github.com/${owner}/${repository}`;
+      const rawUrl = `https://raw.githubusercontent.com/${owner}/${repository}/main/CHANGELOG.md`;
+      document.querySelectorAll('[data-repository]').forEach((a) => { a.href = base; });
+      document.querySelectorAll('[data-releases]').forEach((a) => { a.href = `${base}/releases`; });
+      document.querySelectorAll('[data-changelog-src]').forEach((a) => { a.href = `${base}/blob/main/CHANGELOG.md`; });
+
+      const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      // Inline markdown: escape first, then links, bold, code. Nothing else.
+      const inline = (s) => esc(s)
+        .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>');
+
+      // Keep-a-Changelog structure: ## [version] - date, ### Kind, - bullets.
+      function render(md) {
+        const out = [];
+        let inList = false, inRelease = false;
+        const closeList = () => { if (inList) { out.push('</ul>'); inList = false; } };
+        const closeRelease = () => { closeList(); if (inRelease) { out.push('</section>'); inRelease = false; } };
+        for (const line of md.split(/\r?\n/)) {
+          const h2 = line.match(/^## \[?([^\]]+?)\]?(?: - (.+))?$/);
+          const h3 = line.match(/^### (.+)$/);
+          if (h2) {
+            closeRelease();
+            out.push('<section class="release">');
+            inRelease = true;
+            out.push(`<h2><span class="version">v${esc(h2[1])}</span>${h2[2] ? `<span class="date">${esc(h2[2])}</span>` : ''}</h2>`);
+          } else if (h3) {
+            closeList();
+            out.push(`<h3 class="kind-${esc(h3[1]).toLowerCase()}">${inline(h3[1])}</h3>`);
+          } else if (/^- /.test(line)) {
+            if (!inList) { out.push('<ul>'); inList = true; }
+            out.push(`<li>${inline(line.slice(2))}</li>`);
+          } else if (/^\s+/.test(line) && line.trim() && inList) {
+            // continuation of a wrapped bullet
+            out[out.length - 1] = out[out.length - 1].replace(/<\/li>$/, ` ${inline(line.trim())}</li>`);
+          } else if (line.startsWith('# ')) {
+            // skip the file title; the page has its own
+          } else if (line.trim() && inRelease && !inList) {
+            out.push(`<p>${inline(line.trim())}</p>`);
+          } else if (!line.trim()) {
+            closeList();
+          }
+        }
+        closeRelease();
+        return out.join('\n');
+      }
+
+      fetch(rawUrl)
+        .then((r) => { if (!r.ok) throw new Error(r.status); return r.text(); })
+        .then((md) => { document.getElementById('log').innerHTML = render(md); })
+        .catch(() => {
+          document.getElementById('log').innerHTML =
+            `<p class="fallback">Couldn't load the changelog here — read it on <a href="${base}/blob/main/CHANGELOG.md">GitHub</a>.</p>`;
+        });
+    </script>
+  </body>
+</html>

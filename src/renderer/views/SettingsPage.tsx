@@ -1,4 +1,6 @@
-import { Keyboard, RotateCcw, Settings2, SwatchBook } from 'lucide-react';
+import { ChevronDown, Keyboard, RotateCcw, Settings2, Sparkles, SwatchBook } from 'lucide-react';
+import changelog from '../../../CHANGELOG.md?raw';
+import MDXPreview from '../components/MDXPreview';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import {
@@ -8,6 +10,35 @@ import {
   type Appearance,
 } from '../lib/theme';
 import { DEFAULT_BINDINGS, KEY_ACTIONS, eventToChord, formatChord, type Bindings } from '../lib/keybindings';
+
+// The bundled CHANGELOG, rendered on demand so Settings stays light.
+function WhatsNewSection() {
+  const [open, setOpen] = useState(false);
+  const version = changelog.match(/## \[([^\]]+)\]/)?.[1] ?? '';
+
+  return (
+    <section aria-labelledby="whatsnew-heading" className="border-t border-[var(--divider)] pt-8 mt-8">
+      <div className="mb-2 flex items-start justify-between gap-4">
+        <div className="flex items-start gap-2">
+          <Sparkles className="mt-0.5 h-4 w-4 text-[var(--accent-strong)]" />
+          <div>
+            <h2 id="whatsnew-heading" className="text-sm font-semibold text-[var(--ink)]">What's new{version ? ` — v${version}` : ''}</h2>
+            <p className="mt-0.5 text-xs leading-5 text-[var(--ink-muted)]">The release notes that ship with this build.</p>
+          </div>
+        </div>
+        <Button type="button" variant="outline" size="sm" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+          <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')} />
+          {open ? 'Hide' : 'Show'} changelog
+        </Button>
+      </div>
+      {open && (
+        <div className="mt-4 overflow-hidden rounded-lg border border-[var(--divider)]">
+          <MDXPreview mdxContent={changelog} />
+        </div>
+      )}
+    </section>
+  );
+}
 
 interface SettingsPageProps {
   appearance: Appearance;
@@ -196,6 +227,8 @@ export default function SettingsPage({ appearance, onAppearanceChange, bindings,
         </section>
 
         <KeybindingsSection bindings={bindings} onBindingsChange={onBindingsChange} />
+
+        <WhatsNewSection />
       </div>
     </div>
   );
