@@ -361,7 +361,9 @@ ipcMain.handle('notes:read', async (_event, relativePath: string) => {
     return fs.readFileSync(resolved.fullPath, 'utf-8');
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`Failed to read note ${relativePath}:`, err);
+    // Missing files are an expected probe result (e.g. optional .neuron/layout.json);
+    // only unexpected failures deserve a stack trace in the logs.
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') console.error(`Failed to read note ${relativePath}:`, err);
     return `Error: Could not read note. ${message}`;
   }
 });
@@ -833,6 +835,21 @@ app.on('web-contents-created', (_event, contents) => {
   //    embedded browser; scoped to the webview session so the app is untouched.
   if (contents.getType() === 'webview') {
     contents.session.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+  }
+});
+
+// Single instance: launching Neuron again must focus the existing window,
+// not spawn a rival process. Two instances share the same user-data
+// directory, which corrupts caches ("Unable to move the cache: Access is
+// denied") and makes the second launch look like the app failed to start.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+}
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
   }
 });
 
