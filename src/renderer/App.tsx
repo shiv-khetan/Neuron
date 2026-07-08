@@ -29,6 +29,8 @@ import './surfaces/CanvasSurface'; // registers the .canvas JSON Canvas surface
 import { SurfaceBoundary } from './surfaces/SurfaceBoundary';
 import BrowserView from './components/BrowserView';
 import { DEFAULT_BINDINGS, eventToChord, resolveBindings, type Bindings } from './lib/keybindings';
+import { DEFAULT_LAYOUT, resolveLayout, type WorkbenchLayout } from './lib/layout';
+import ActivityRail, { type SidebarMode } from './components/ActivityRail';
 
 const isUrl = (s: string | null): s is string => !!s && /^https?:\/\//.test(s);
 
@@ -97,12 +99,48 @@ export default function App() {
   const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
   const [appearanceReady, setAppearanceReady] = useState(false);
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [rightPanelOpen, setRightPanelOpen] = useState(false);
-  const [bottomPanelOpen, setBottomPanelOpen] = useState(false);
+  // Workbench layout: which shell regions are visible. Persisted per user.
+  const [layout, setLayout] = useState<WorkbenchLayout>(DEFAULT_LAYOUT);
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>('files');
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
+  const zenPrevRef = useRef<WorkbenchLayout | null>(null);
+  const lastEscapeRef = useRef(0);
+
+  const commitLayout = useCallback((next: WorkbenchLayout) => {
+    setLayout(next);
+    void window.electronAPI?.settings.set('layout', next);
+  }, []);
+
+  const patchLayout = useCallback((patch: Partial<WorkbenchLayout>) => {
+    const prev = layoutRef.current;
+    let next = { ...prev, ...patch };
+    if (patch.zen === true && !prev.zen) {
+      // Entering zen: hide the chrome, remember what to restore.
+      zenPrevRef.current = prev;
+      next = { ...next, activityBar: false, sidebar: false, rightPanel: false, bottomPanel: false };
+    } else if (patch.zen === false && prev.zen) {
+      next = { ...(zenPrevRef.current ?? DEFAULT_LAYOUT), zen: false };
+    }
+    commitLayout(next);
+  }, [commitLayout]);
+
+  useEffect(() => {
+    void window.electronAPI?.settings.get<Partial<WorkbenchLayout>>('layout').then((stored) => {
+      if (stored) setLayout(resolveLayout(stored));
+    });
+  }, []);
+
+  const sidebarOpen = layout.sidebar;
+  const rightPanelOpen = layout.rightPanel;
+  const bottomPanelOpen = layout.bottomPanel;
+  const setSidebarOpen = (fn: (v: boolean) => boolean) => patchLayout({ sidebar: fn(layoutRef.current.sidebar) });
+  const setRightPanelOpen = (fn: ((v: boolean) => boolean) | boolean) => patchLayout({ rightPanel: typeof fn === 'boolean' ? fn : fn(layoutRef.current.rightPanel) });
+  const setBottomPanelOpen = (fn: ((v: boolean) => boolean) | boolean) => patchLayout({ bottomPanel: typeof fn === 'boolean' ? fn : fn(layoutRef.current.bottomPanel) });
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [createSection, setCreateSection] = useState('');
+  const [createTab, setCreateTab] = useState<'note' | 'section'>('note');
   const [wide, setWide] = useState(true);
   const [bindings, setBindings] = useState<Bindings>(DEFAULT_BINDINGS);
   const [surfaceSourceMode, setSurfaceSourceMode] = useState<Record<string, boolean>>({});
@@ -307,6 +345,7 @@ export default function App() {
   }, [selectedNote]);
 
   const requestCreate = useCallback((section?: string) => {
+    setCreateTab('note');
     setCreateSection(section ?? '');
     setCreateOpen(true);
   }, []);
@@ -442,6 +481,12 @@ export default function App() {
   // Global shortcut dispatcher, driven by the (configurable) binding map.
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      // Zen mode exits on a double Escape press.
+      if (event.key === 'Escape' && layoutRef.current.zen) {
+        const now = Date.now();
+        if (now - lastEscapeRef.current < 900) { patchLayout({ zen: false }); lastEscapeRef.current = 0; return; }
+        lastEscapeRef.current = now;
+      }
       const chord = eventToChord(event);
       if (!chord) return;
       const match = Object.entries(bindings).find(([, c]) => c === chord);
@@ -455,11 +500,12 @@ export default function App() {
         case 'toggle-sidebar': setSidebarOpen((v) => !v); break;
         case 'toggle-right': setRightPanelOpen((v) => !v); break;
         case 'toggle-bottom': setBottomPanelOpen((v) => !v); break;
+        case 'toggle-zen': patchLayout({ zen: !layoutRef.current.zen }); break;
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [bindings, requestCreate, createSurfaceFile, openWebsite]);
+  }, [bindings, requestCreate, createSurfaceFile, openWebsite, patchLayout]);
 
   const saveLabel = { idle: 'No note open', saving: 'Saving…', saved: 'Saved locally', error: 'Save failed' }[saveState];
 
@@ -585,7 +631,7 @@ export default function App() {
   return (
     <PluginProvider catalog={builtinPlugins} bridge={bridge}>
       <TooltipProvider delayDuration={300}>
-        <div className="workspace-grid app-shell font-sans">
+        <div className={`workspace-grid app-shell font-sans${layout.statusBar ? '' : ' no-status'}`}>
           <TitleBar
             repository={repository}
             recents={recents}
@@ -601,6 +647,9 @@ export default function App() {
             onSwitchRepo={switchRepository}
             onOpenRepo={openRepository}
             onCreateRepo={createRepository}
+            layout={layout}
+            onLayoutChange={patchLayout}
+            onResetLayout={() => { zenPrevRef.current = null; commitLayout({ ...DEFAULT_LAYOUT }); }}
           />
 
           {!repoReady ? (
@@ -608,7 +657,23 @@ export default function App() {
           ) : !repository ? (
             <RepositoryOnboarding recents={recents} onCreate={createRepository} onOpen={openRepository} onSwitch={switchRepository} />
           ) : (
-            <PanelGroup direction="horizontal" autoSaveId="neuron.shell.h" className="flex min-h-0 overflow-hidden">
+            <div className="flex min-h-0 min-w-0 overflow-hidden">
+              {layout.activityBar && (
+                <ActivityRail
+                  view={view}
+                  sidebarMode={sidebarMode}
+                  sidebarOpen={sidebarOpen}
+                  tagCount={tags.length}
+                  onSelectMode={(mode) => {
+                    if (view === 'notes' && sidebarOpen && sidebarMode === mode) { patchLayout({ sidebar: false }); return; }
+                    setSidebarMode(mode);
+                    setView('notes');
+                    if (!sidebarOpen) patchLayout({ sidebar: true });
+                  }}
+                  onNavigate={setView}
+                />
+              )}
+            <PanelGroup direction="horizontal" autoSaveId="neuron.shell.h" className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
               {sidebarOpen && (
                 <>
                   <Panel id="sidebar" order={1} defaultSize={18} minSize={12} maxSize={40} className="min-w-0">
@@ -618,8 +683,10 @@ export default function App() {
                       onSelectNote={handleSelectNote}
                       onDeleteNote={handleDeleteNote}
                       onRequestCreate={requestCreate}
+                      onRequestCreateFolder={() => { setCreateTab('section'); setCreateSection(''); setCreateOpen(true); }}
+                      onRefresh={loadNotes}
                       view={view}
-                      onNavigate={setView}
+                      mode={sidebarMode}
                       repositoryName={repository.name}
                       tags={tags}
                       onSelectTag={setSelectedTag}
@@ -673,9 +740,10 @@ export default function App() {
                 </PanelGroup>
               </Panel>
             </PanelGroup>
+            </div>
           )}
 
-          <StatusBar repositoryName={repository?.name ?? null} activeNote={view === 'notes' ? selectedNote : null} saveState={saveState} />
+          {layout.statusBar && <StatusBar repositoryName={repository?.name ?? null} activeNote={view === 'notes' ? selectedNote : null} saveState={saveState} />}
         </div>
 
         <CreateModal
@@ -683,6 +751,7 @@ export default function App() {
           onOpenChange={setCreateOpen}
           sections={sections}
           initialSection={createSection}
+          initialTab={createTab}
           onCreateNote={createNote}
           onCreateSection={createSectionFolder}
         />

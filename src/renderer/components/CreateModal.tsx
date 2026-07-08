@@ -12,6 +12,8 @@ interface CreateModalProps {
   sections: string[];
   /** Section pre-selected when the dialog opens (folder path or ''). */
   initialSection?: string;
+  /** Tab shown when the dialog opens (note by default). */
+  initialTab?: 'note' | 'section';
   onCreateNote: (relativePath: string) => Promise<boolean>;
   onCreateSection: (path: string, firstNoteName?: string) => Promise<boolean>;
 }
@@ -20,7 +22,7 @@ function slugSegment(value: string): string {
   return value.trim().replace(/[^a-zA-Z0-9 _-]/g, '').replace(/\s+/g, '-').toLowerCase();
 }
 
-export default function CreateModal({ open, onOpenChange, sections, initialSection = '', onCreateNote, onCreateSection }: CreateModalProps) {
+export default function CreateModal({ open, onOpenChange, sections, initialSection = '', initialTab = 'note', onCreateNote, onCreateSection }: CreateModalProps) {
   const [noteName, setNoteName] = useState('');
   const [noteSection, setNoteSection] = useState(initialSection);
   const [sectionName, setSectionName] = useState('');
@@ -66,7 +68,7 @@ export default function CreateModal({ open, onOpenChange, sections, initialSecti
           <DialogDescription>Add a new note, or a section (folder) to group notes.</DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="note">
+        <Tabs key={`${open}-${initialTab}`} defaultValue={initialTab}>
           <TabsList>
             <TabsTrigger value="note"><FilePlus2 className="h-3.5 w-3.5" /> Note</TabsTrigger>
             <TabsTrigger value="section"><FolderPlus className="h-3.5 w-3.5" /> Section</TabsTrigger>

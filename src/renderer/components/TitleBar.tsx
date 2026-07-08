@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import {
-  PanelLeft, PanelRight, PanelBottom, Search, Blocks, Minus, Square, Copy, X,
-  FolderGit2, ChevronDown, FolderOpen, FolderPlus, Cloud,
+  PanelLeft, PanelRight, PanelBottom, PanelsTopLeft, Search, Blocks, Minus, Square, Copy, X,
+  FolderGit2, ChevronDown, FolderOpen, FolderPlus, Cloud, Focus, RotateCcw,
 } from 'lucide-react';
 import type { RepositoryInfo } from '../electron.d';
+import type { WorkbenchLayout } from '../lib/layout';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuLabel, DropdownMenuSeparator,
+  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem,
 } from './ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { cn } from '../lib/utils';
@@ -26,6 +27,9 @@ interface TitleBarProps {
   onSwitchRepo: (dir: string) => void;
   onOpenRepo: () => void;
   onCreateRepo: () => void;
+  layout: WorkbenchLayout;
+  onLayoutChange: (patch: Partial<WorkbenchLayout>) => void;
+  onResetLayout: () => void;
 }
 
 function IconButton({ label, active, onClick, children }: { label: string; active?: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -147,6 +151,32 @@ export default function TitleBar(props: TitleBarProps) {
           <IconButton label={props.bottomPanelOpen ? 'Hide bottom peek' : 'Show bottom peek'} active={props.bottomPanelOpen} onClick={props.onToggleBottomPanel}>
             <PanelBottom className="h-4 w-4" />
           </IconButton>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                aria-label="Customize layout"
+                title="Customize layout"
+                className="titlebar-no-drag interactive grid h-7 w-7 place-items-center rounded-md text-[var(--ink-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--ink)]"
+              >
+                <PanelsTopLeft className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Customize layout</DropdownMenuLabel>
+              <DropdownMenuCheckboxItem checked={props.layout.activityBar} onCheckedChange={(c) => props.onLayoutChange({ activityBar: !!c })}>Activity bar</DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem checked={props.layout.sidebar} onCheckedChange={(c) => props.onLayoutChange({ sidebar: !!c })}>Sidebar</DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem checked={props.layout.rightPanel} onCheckedChange={(c) => props.onLayoutChange({ rightPanel: !!c })}>Side panel</DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem checked={props.layout.bottomPanel} onCheckedChange={(c) => props.onLayoutChange({ bottomPanel: !!c })}>Bottom panel</DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem checked={props.layout.statusBar} onCheckedChange={(c) => props.onLayoutChange({ statusBar: !!c })}>Status bar</DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => props.onLayoutChange({ zen: !props.layout.zen })}>
+                <Focus className="h-4 w-4" /> {props.layout.zen ? 'Exit zen mode' : 'Zen mode'}
+                <span className="ml-auto pl-4 font-mono text-[10px] text-[var(--ink-muted)]">Alt+Z</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={props.onResetLayout}><RotateCcw className="h-4 w-4" /> Reset layout</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <div className="ml-1 flex items-center">

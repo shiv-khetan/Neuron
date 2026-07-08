@@ -15,6 +15,7 @@ export const KEY_ACTIONS: KeyAction[] = [
   { id: 'toggle-sidebar', label: 'Toggle sidebar', default: 'mod+b' },
   { id: 'toggle-right', label: 'Toggle side panel', default: 'mod+j' },
   { id: 'toggle-bottom', label: 'Toggle bottom panel', default: 'mod+`' },
+  { id: 'toggle-zen', label: 'Toggle zen mode', default: 'alt+z' },
 ];
 
 export type Bindings = Record<string, string>;

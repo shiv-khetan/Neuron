@@ -121,10 +121,14 @@ input:focus-visible,
 
 /* App shell grid: titlebar row + workspace row + status bar */
 .workspace-grid { display: grid; grid-template-rows: 40px minmax(0, 1fr) 24px; height: 100vh; width: 100vw; }
+.workspace-grid.no-status { grid-template-rows: 40px minmax(0, 1fr); }
 
 /* Maximized window fixes for Windows 8px bleed */
 body.window-maximized .workspace-grid {
   grid-template-rows: 48px minmax(0, 1fr) 24px;
+}
+body.window-maximized .workspace-grid.no-status {
+  grid-template-rows: 48px minmax(0, 1fr);
 }
 body.window-maximized .titlebar {
   padding-top: 8px;
