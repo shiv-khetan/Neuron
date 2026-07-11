@@ -1,13 +1,13 @@
-// Security helpers shared by the custom-view surfaces (.vw, .db, .canvas).
-// Views are user-authored documents; treat every URL and every document as
+// Security helpers shared by the file surfaces (.db, .canvas). Surface
+// documents are user-authored; treat every URL and every document as
 // untrusted input even though they live in the user's own workspace — synced
 // folders and shared workspaces mean someone else may have written them.
 
-/** Byte ceiling for a single view document (parse refusal, not truncation). */
+/** Byte ceiling for a single surface document (parse refusal, not truncation). */
 export const MAX_DOC_BYTES = 2 * 1024 * 1024;
-/** Max rendered nodes in one .vw tree — beyond this is a mistake or an attack. */
+/** Max rendered nodes in one surface tree — beyond this is a mistake or an attack. */
 export const MAX_NODES = 2000;
-/** Max nesting depth for a .vw tree. */
+/** Max nesting depth for a surface tree. */
 export const MAX_DEPTH = 40;
 
 /**

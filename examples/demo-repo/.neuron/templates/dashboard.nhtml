@@ -1,0 +1,9 @@
+<h1>{{ variables.dashboardTitle }}</h1>
+<section class="neuron-grid cols-3">
+  <div class="neuron-card" hx-get="/api/v1/fragments/workspace-summary" hx-trigger="load" hx-swap="innerHTML">Loading…</div>
+  <div class="neuron-card" hx-get="/api/v1/fragments/hello" hx-trigger="load" hx-swap="innerHTML">Loading…</div>
+  <div class="neuron-card">
+    <div class="neuron-metric-label">Tags</div>
+    <div hx-get="/api/v1/tags" hx-trigger="load" hx-swap="innerHTML">Loading…</div>
+  </div>
+</section>

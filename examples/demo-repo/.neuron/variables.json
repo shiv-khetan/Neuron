@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "variables": {
+    "dashboardTitle": {
+      "type": "string",
+      "value": "Team dashboard",
+      "writable": false,
+      "description": "Heading used by Team dashboard.nhtml."
+    },
+    "projectStatus": {
+      "type": "string",
+      "value": "paused",
+      "writable": true,
+      "description": "Editable from the dashboard's status form."
+    }
+  }
+}

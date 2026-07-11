@@ -30,20 +30,11 @@ export interface NetRequestResult {
   error?: string;
 }
 
-export interface ViewSourceResult {
-  success: boolean;
-  count?: number;
-  byExtension?: Record<string, number>;
-  rows?: { path: string; extension: string; size: number; modified: string }[];
-  error?: string;
-}
-
-export interface ViewCsvResult {
-  success: boolean;
-  columns?: string[];
-  rows?: string[][];
-  error?: string;
-}
+/** Result of opening an HTMX view: ready to render, awaiting approval, or failed. */
+export type HtmxViewOpenResult =
+  | { status: 'ready'; sessionId: string; url: string; partition: string; name: string }
+  | { status: 'needs-approval'; name: string; permissions: string[]; description?: string }
+  | { status: 'error'; message: string };
 
 export interface ElectronAPI {
   // Notes
@@ -107,10 +98,13 @@ export interface ElectronAPI {
     onExit: (callback: (id: number, exitCode: number) => void) => () => void;
   };
   views: {
-    source: (request: { type: string; glob?: string; limit?: number }) => Promise<ViewSourceResult>;
-    action: (action: { type: string; path?: string; content?: string }) => Promise<{ success: boolean; stdout?: string; stderr?: string; code?: number; error?: string }>;
-    csv: (relativePath: string) => Promise<ViewCsvResult>;
     file: (relativePath: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
+  };
+  htmxViews: {
+    open: (relativePath: string, theme?: 'light' | 'dark') => Promise<HtmxViewOpenResult>;
+    approve: (relativePath: string, scope: 'always' | 'once') => Promise<{ success: boolean; error?: string }>;
+    close: (sessionId: string) => Promise<{ success: boolean }>;
+    resetApproval: (relativePath: string) => Promise<{ success: boolean }>;
   };
   cookies: {
     importChrome: (domain?: string) => Promise<{ success: boolean; imported?: number; skipped?: number; error?: string }>;

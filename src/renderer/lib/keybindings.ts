@@ -10,7 +10,7 @@ export interface KeyAction {
 export const KEY_ACTIONS: KeyAction[] = [
   { id: 'palette', label: 'Open command palette', default: 'mod+k' },
   { id: 'new-note', label: 'New note or section', default: 'mod+n' },
-  { id: 'new-view', label: 'New block view in current folder', default: 'mod+g' },
+  { id: 'new-view', label: 'New HTMX view in current folder', default: 'mod+g' },
   { id: 'open-website', label: 'Open website tab', default: 'mod+shift+o' },
   { id: 'toggle-sidebar', label: 'Toggle sidebar', default: 'mod+b' },
   { id: 'toggle-right', label: 'Toggle side panel', default: 'mod+j' },

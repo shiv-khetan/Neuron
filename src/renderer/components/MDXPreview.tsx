@@ -1,10 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Badge, Callout, parseSemanticType } from './mdx-components';
+import DocumentProperties from './properties/DocumentProperties';
+import { parseFrontmatter } from '../lib/frontmatter';
 
 interface MDXPreviewProps {
   mdxContent: string;
   onLineClick?: (lineIndex: number) => void;
+  showProperties?: boolean;
+  tagSuggestions?: string[];
+  onTagClick?: (tag: string) => void;
+  defaultPropertiesCollapsed?: boolean;
 }
 
 interface MDXParseError extends Error {
@@ -57,7 +63,7 @@ function parseTableDivider(row: string): TableAlignment[] | null {
 // 2. MDX RENDERER ENGINE WITH ERROR LEDGER
 // ==========================================
 
-export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps) {
+export default function MDXPreview({ mdxContent, onLineClick, showProperties = true, tagSuggestions = [], onTagClick, defaultPropertiesCollapsed = false }: MDXPreviewProps) {
   const [renderedContent, setRenderedContent] = useState<React.ReactNode[]>([]);
   const [compilationError, setCompilationError] = useState<{
     message: string;
@@ -65,10 +71,16 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
     remediation: string;
   } | null>(null);
 
+  // Strip the leading frontmatter block so it never renders as stray text or a
+  // horizontal rule. Line clicks are offset back to the original document.
+  const fm = useMemo(() => parseFrontmatter(mdxContent), [mdxContent]);
+  const fmLineOffset = fm.hasFrontmatter ? (mdxContent.slice(0, fm.bodyStart).match(/\n/g)?.length ?? 0) : 0;
+  const lineClick = (index: number) => onLineClick?.(index + fmLineOffset);
+
   useEffect(() => {
     setCompilationError(null);
     try {
-      const parsedBlocks = parseMDX(mdxContent);
+      const parsedBlocks = parseMDX(fm.body);
       setRenderedContent(parsedBlocks);
     } catch (caughtError: unknown) {
       const error = normalizeError(caughtError);
@@ -92,7 +104,7 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
         });
       }
     }
-  }, [mdxContent]);
+  }, [fm.body]);
 
   // Parsing helper to split and evaluate markdown vs custom components
   function parseMDX(content: string): React.ReactNode[] {
@@ -117,7 +129,7 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
         nodes.push(
           <pre
             key={`code-${i}`}
-            onClick={() => onLineClick?.(startLine)}
+            onClick={() => lineClick(startLine)}
             className="work-surface my-5 overflow-x-auto rounded-md border p-4 font-mono text-sm text-[var(--md-text)] cursor-pointer hover:border-[var(--accent)] transition-colors duration-150"
           >
             {lang && <div className="mb-2 text-[10px] font-medium text-muted">{lang}</div>}
@@ -144,7 +156,7 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
         nodes.push(
           <div
             key={`table-${i}`}
-            onClick={() => onLineClick?.(startLine)}
+            onClick={() => lineClick(startLine)}
             className="my-5 overflow-x-auto rounded-md border border-[var(--divider)] cursor-pointer hover:border-[var(--accent)] transition-colors duration-150"
           >
             <table className="w-full min-w-[32rem] border-collapse font-sans text-sm text-[var(--md-text)]">
@@ -197,7 +209,7 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
               key={`jsx-${i}`}
               onClick={(e) => {
                 if ((e.target as HTMLElement).closest('button')) return;
-                onLineClick?.(startLine);
+                lineClick(startLine);
               }}
               className="cursor-pointer hover:bg-[rgba(255,255,255,0.01)] rounded transition-colors duration-150"
             >
@@ -242,7 +254,7 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
             key={`jsx-${startLine}`}
             onClick={(e) => {
               if ((e.target as HTMLElement).closest('button')) return;
-              onLineClick?.(startLine);
+              lineClick(startLine);
             }}
             className="cursor-pointer hover:bg-[rgba(255,255,255,0.01)] rounded transition-colors duration-150"
           >
@@ -327,7 +339,7 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
       return (
         <h1
           key={index}
-          onClick={() => onLineClick?.(index)}
+          onClick={() => lineClick(index)}
           className="mt-7 mb-3 border-b divider-color pb-3 font-sans text-2xl font-semibold text-[var(--md-heading)] cursor-pointer hover:bg-[rgba(255,255,255,0.015)] rounded px-1 -mx-1 transition-colors duration-150"
         >
           {text.slice(2)}
@@ -338,7 +350,7 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
       return (
         <h2
           key={index}
-          onClick={() => onLineClick?.(index)}
+          onClick={() => lineClick(index)}
           className="mt-6 mb-2 font-sans text-xl font-semibold text-[var(--md-heading)] cursor-pointer hover:bg-[rgba(255,255,255,0.015)] rounded px-1 -mx-1 transition-colors duration-150"
         >
           {text.slice(3)}
@@ -349,7 +361,7 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
       return (
         <h3
           key={index}
-          onClick={() => onLineClick?.(index)}
+          onClick={() => lineClick(index)}
           className="mt-5 mb-2 font-sans text-base font-semibold text-[var(--md-heading)] cursor-pointer hover:bg-[rgba(255,255,255,0.015)] rounded px-1 -mx-1 transition-colors duration-150"
         >
           {text.slice(4)}
@@ -366,7 +378,7 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
         return (
           <ul
             key={index}
-            onClick={() => onLineClick?.(index)}
+            onClick={() => lineClick(index)}
             className="my-2 list-none font-sans text-sm leading-6 text-[var(--md-text)] cursor-pointer hover:bg-[rgba(255,255,255,0.015)] rounded px-1 -mx-1 transition-colors duration-150"
           >
             <li className="flex items-start gap-2">
@@ -385,7 +397,7 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
       return (
         <ul
           key={index}
-          onClick={() => onLineClick?.(index)}
+          onClick={() => lineClick(index)}
           className="my-2 list-disc space-y-1 pl-6 font-sans text-sm leading-6 text-[var(--md-text)] cursor-pointer hover:bg-[rgba(255,255,255,0.015)] rounded px-1 -mx-1 transition-colors duration-150"
         >
           <li>{parseInlineFormatting(item)}</li>
@@ -398,7 +410,7 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
       return (
         <blockquote
           key={index}
-          onClick={() => onLineClick?.(index)}
+          onClick={() => lineClick(index)}
           className="my-4 rounded-md border border-[var(--md-quote-border)] bg-[var(--surface)] px-4 py-3 font-sans text-sm italic text-[var(--md-quote)] cursor-pointer hover:border-[var(--accent)] transition-colors duration-150"
         >
           {parseInlineFormatting(text.slice(2))}
@@ -412,7 +424,7 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
       return (
         <div
           key={index}
-          onClick={() => onLineClick?.(index)}
+          onClick={() => lineClick(index)}
           className="my-2 flex items-start gap-2 font-sans text-sm leading-6 text-[var(--md-text)] cursor-pointer hover:bg-[rgba(255,255,255,0.015)] rounded px-1 -mx-1 transition-colors duration-150"
         >
           <input
@@ -431,7 +443,7 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
     return (
       <p
         key={index}
-        onClick={() => onLineClick?.(index)}
+        onClick={() => lineClick(index)}
         className="my-2 font-sans text-sm leading-7 text-[var(--md-text)] cursor-pointer hover:bg-[rgba(255,255,255,0.015)] rounded px-1 -mx-1 transition-colors duration-150"
       >
         {parseInlineFormatting(text)}
@@ -475,6 +487,11 @@ export default function MDXPreview({ mdxContent, onLineClick }: MDXPreviewProps)
 
   return (
     <div className="canvas-surface h-full w-full overflow-y-auto p-7 font-sans select-text">
+      {showProperties && fm.hasFrontmatter && (
+        <div className="preview-prose mx-auto mb-4">
+          <DocumentProperties doc={mdxContent} tagSuggestions={tagSuggestions} onTagClick={onTagClick} defaultCollapsed={defaultPropertiesCollapsed} hideWhenEmpty />
+        </div>
+      )}
       {compilationError ? (
         <div role="alert" className="surface-danger rounded-md border p-5 font-sans">
           <div className="mb-3 flex items-center space-x-2 font-semibold text-danger">

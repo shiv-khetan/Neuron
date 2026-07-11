@@ -460,7 +460,7 @@ html[data-theme='light'] .neuron-logo {
 
 
 
-/* Default typography for .vw views so raw HTML looks styled out of the box. */
+/* Shared typography for surface documents (.db databases use vw-content). */
 .vw-content > * + * { margin-top: 1rem; }
 .vw-content h1 { font-size: 1.5rem; font-weight: 600; color: var(--ink); }
 .vw-content h2 { font-size: 1.25rem; font-weight: 600; color: var(--ink); margin-top: 1.5rem; }
@@ -474,16 +474,6 @@ html[data-theme='light'] .neuron-logo {
 .vw-content pre { background: var(--surface); padding: 0.75rem 1rem; border-radius: 8px; overflow-x: auto; border: 1px solid var(--divider); }
 .vw-content pre code { background: none; padding: 0; }
 .vw-content hr { border: none; border-top: 1px solid var(--divider); }
-
-/* Block label (database / section titles). */
-.vw-content .vw-label { font-size: 0.75rem; font-weight: 600; color: var(--ink-muted); }
-
-/* Read-only file table inside a tile. */
-.vw-content .vw-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-.vw-content .vw-table th { text-align: left; font-weight: 500; color: var(--ink-muted); padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--divider); }
-.vw-content .vw-table td { padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--divider); color: var(--ink-secondary); }
-.vw-content .vw-table tr:last-child td { border-bottom: none; }
-.vw-content .vw-chip { display: inline-block; font-family: var(--font-mono, monospace); font-size: 0.7rem; padding: 0.05rem 0.4rem; border-radius: 4px; background: var(--surface-hover); color: var(--ink-secondary); }
 
 /* Editable Notion-style database. Borderless; thin row dividers; hover rows. */
 .vw-content .vw-db { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
@@ -505,20 +495,18 @@ html[data-theme='light'] .neuron-logo {
 .vw-content .vw-newrow { display: flex; align-items: center; gap: 0.35rem; width: 100%; padding: 0.4rem 0.5rem; margin-top: 0.15rem; font-size: 0.8rem; color: var(--ink-muted); border-radius: 5px; transition: background-color 0.12s ease-out, color 0.12s ease-out; }
 .vw-content .vw-newrow:hover { background: var(--surface-hover); color: var(--ink); }
 
-/* Progress bar (habit / driver completion). */
-.vw-content .vw-progress-track { height: 0.5rem; border-radius: 999px; background: var(--surface-hover); overflow: hidden; }
-.vw-content .vw-progress-fill { height: 100%; border-radius: 999px; background: var(--accent); transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
-
-/* Habit heatmap (GitHub-style contribution grid). */
-.vw-content .vw-heatmap { display: flex; gap: 3px; overflow-x: auto; padding-top: 0.25rem; }
-.vw-content .vw-heatmap-col { display: flex; flex-direction: column; gap: 3px; }
-.vw-content .vw-heatmap-cell { width: 13px; height: 13px; border-radius: 3px; background: var(--surface-hover); }
-.vw-content .vw-heatmap-cell[data-level="1"] { background: color-mix(in oklch, var(--accent) 28%, var(--surface)); }
-.vw-content .vw-heatmap-cell[data-level="2"] { background: color-mix(in oklch, var(--accent) 50%, var(--surface)); }
-.vw-content .vw-heatmap-cell[data-level="3"] { background: color-mix(in oklch, var(--accent) 75%, var(--surface)); }
-.vw-content .vw-heatmap-cell[data-level="4"] { background: var(--accent); }
-
 @media (prefers-reduced-motion: reduce) {
   .vw-content .vw-db tbody tr, .vw-content .vw-icon-btn, .vw-content .vw-newrow { transition: none; }
-  .vw-content .vw-progress-fill { transition: none; }
 }
+
+/* Markdown inside canvas text cards (renderer: src/renderer/canvas/markdown.tsx).
+   Sizes are em-based so a card's neuron.style fontSize scales everything. */
+.cnv-md-h1 { font-size: 1.3em; font-weight: 600; line-height: 1.3; margin-bottom: 0.25rem; }
+.cnv-md-h2 { font-size: 1.15em; font-weight: 600; line-height: 1.3; margin-bottom: 0.2rem; }
+.cnv-md-h3 { font-size: 1em; font-weight: 600; line-height: 1.3; margin-bottom: 0.15rem; }
+.cnv-md-p { margin: 0.15rem 0; line-height: 1.45; }
+.cnv-md-list { padding-left: 1.1rem; margin: 0.15rem 0; }
+.cnv-md-list li { margin: 0.1rem 0; }
+.cnv-md-code { font-family: var(--font-mono, monospace); font-size: 0.85em; background: color-mix(in srgb, var(--ink) 8%, transparent); padding: 0.05rem 0.25rem; border-radius: 4px; }
+.cnv-md-pre { font-family: var(--font-mono, monospace); font-size: 0.78rem; background: color-mix(in srgb, var(--ink) 6%, transparent); border-radius: 6px; padding: 0.4rem 0.5rem; margin: 0.2rem 0; overflow-x: auto; white-space: pre; }
+.cnv-md-quote { border-left: 2px solid var(--divider); padding-left: 0.5rem; color: var(--ink-secondary); margin: 0.15rem 0; }

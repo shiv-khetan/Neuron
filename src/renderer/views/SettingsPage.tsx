@@ -1,7 +1,8 @@
-import { ChevronDown, Keyboard, RotateCcw, Settings2, Sparkles, SwatchBook } from 'lucide-react';
+import { ChevronDown, Keyboard, ListTree, RotateCcw, Settings2, Sparkles, SwatchBook } from 'lucide-react';
 import changelog from '../../../CHANGELOG.md?raw';
 import MDXPreview from '../components/MDXPreview';
 import { Button } from '../components/ui/button';
+import { Switch } from '../components/ui/switch';
 import { cn } from '../lib/utils';
 import {
   MARKDOWN_FIELDS,
@@ -40,11 +41,46 @@ function WhatsNewSection() {
   );
 }
 
+export interface PropertiesSettings { removeEmpty: boolean; showInReading: boolean; collapsedByDefault: boolean }
+
 interface SettingsPageProps {
   appearance: Appearance;
   onAppearanceChange: (appearance: Appearance) => void;
   bindings: Bindings;
   onBindingsChange: (bindings: Bindings) => void;
+  properties: PropertiesSettings;
+  onPropertiesChange: (properties: PropertiesSettings) => void;
+}
+
+const PROPERTY_TOGGLES: { key: keyof PropertiesSettings; label: string; hint: string }[] = [
+  { key: 'showInReading', label: 'Show properties in reading view', hint: 'Render the properties panel above the rendered note.' },
+  { key: 'collapsedByDefault', label: 'Collapse properties by default', hint: 'Start each note with the properties panel collapsed.' },
+  { key: 'removeEmpty', label: 'Remove empty frontmatter', hint: 'Delete the frontmatter block automatically when the last property is removed.' },
+];
+
+function PropertiesSection({ properties, onPropertiesChange }: { properties: PropertiesSettings; onPropertiesChange: (p: PropertiesSettings) => void }) {
+  return (
+    <section aria-labelledby="properties-heading" className="border-t border-[var(--divider)] pt-8">
+      <div className="mb-4 flex items-start gap-2">
+        <ListTree className="mt-0.5 h-4 w-4 text-[var(--accent-strong)]" />
+        <div>
+          <h2 id="properties-heading" className="text-sm font-semibold text-[var(--ink)]">Document properties</h2>
+          <p className="mt-0.5 text-xs leading-5 text-[var(--ink-muted)]">How YAML frontmatter is shown and edited as a properties panel.</p>
+        </div>
+      </div>
+      <div className="divide-y divide-[var(--divider)] border-y border-[var(--divider)]">
+        {PROPERTY_TOGGLES.map(({ key, label, hint }) => (
+          <div key={key} className="grid min-h-[52px] grid-cols-[1fr_auto] items-center gap-4 py-2.5">
+            <label htmlFor={`prop-${key}`} className="text-sm text-[var(--ink-secondary)]">
+              {label}
+              <span className="mt-0.5 block text-xs text-[var(--ink-muted)]">{hint}</span>
+            </label>
+            <Switch id={`prop-${key}`} checked={properties[key]} onCheckedChange={(v) => onPropertiesChange({ ...properties, [key]: v })} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function KeybindingsSection({ bindings, onBindingsChange }: { bindings: Bindings; onBindingsChange: (b: Bindings) => void }) {
@@ -115,7 +151,7 @@ function ThemeSwatches({ presetId }: { presetId: string }) {
   );
 }
 
-export default function SettingsPage({ appearance, onAppearanceChange, bindings, onBindingsChange }: SettingsPageProps) {
+export default function SettingsPage({ appearance, onAppearanceChange, bindings, onBindingsChange, properties, onPropertiesChange }: SettingsPageProps) {
   const [resolvedColors, setResolvedColors] = useState<Record<string, string>>({});
 
   useLayoutEffect(() => {
@@ -225,6 +261,8 @@ export default function SettingsPage({ appearance, onAppearanceChange, bindings,
             })}
           </div>
         </section>
+
+        <PropertiesSection properties={properties} onPropertiesChange={onPropertiesChange} />
 
         <KeybindingsSection bindings={bindings} onBindingsChange={onBindingsChange} />
 

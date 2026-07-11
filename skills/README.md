@@ -4,7 +4,7 @@ Drop-in skills that teach AI agents how to work with Neuron.
 
 | Skill | Teaches |
 | --- | --- |
-| [neuron-mini-apps](neuron-mini-apps/SKILL.md) | Building mini apps from `.vw` views, CSV-backed databases, and action buttons |
+| [neuron-mini-apps](neuron-mini-apps/SKILL.md) | Building mini apps from `.nhtml` HTMX views, `.db` databases, and `.canvas` boards |
 
 ## Injecting into an agent
 

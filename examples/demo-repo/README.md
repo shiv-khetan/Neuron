@@ -14,11 +14,10 @@ Then start at **getting-started** in the sidebar and follow the links.
 
 | Note | Shows |
 | --- | --- |
-| Workspace view | A block-based `.vw` surface with metrics, file counts, graphs, tables, checklists, and action buttons |
 | getting-started | The hub — links, tags, a callout, a badge |
 | markdown-basics | Headings, lists, quotes, code blocks, inline styles |
 | mdx-components | The live `Badge` and `Callout` components |
-| building-uis-and-dashboards | How to assemble notes and `.vw` block views |
+| building-htmx-views | How to build custom HTMX view interfaces |
 | wikilinks-and-tags | `[[wikilinks]]`, the graph, and `#tags` |
 | sections-and-workspaces | Folders, nesting, and workspaces |
 | plugins-and-ai | Enabling Claude, a local model, and Daily Notes |
@@ -29,17 +28,17 @@ Then start at **getting-started** in the sidebar and follow the links.
 | Surface file | Shows |
 | --- | --- |
 | .neuron/layout.json | The internal workspace shell layout |
-| Workspace view.vw | A block-based surface powered by local workspace sources |
-| Dashboard (default).vw | A dashboard composed from the standard blocks |
-| Dashboard (custom).vw | The same data (`data/*.csv`) in a fully custom HTML + Tailwind layout |
+| .neuron/variables.json | Typed variables available to HTMX views |
+| Team dashboard.nhtml | An HTMX view: live summary, search, and an editable status variable |
+| Team dashboard.neuron.json | The view's manifest — declared permissions and path scopes |
 | Projects.db | A Notion-style database with table, board, and card layouts |
 | Idea board.canvas | A JSON Canvas spatial board with groups and labelled connections |
 
 ## Try these
 
-- Press **Ctrl/Cmd + K** and run **New block view in current folder** to create a `.vw` surface.
-- Use `.vw` files when you want live metrics, source tables, charts, checklists, and trusted action buttons.
-- Open **Dashboard (default).vw** and **Dashboard (custom).vw** side by side — same CSVs, standard blocks vs. custom layout; edits in one appear in the other.
-- Open **Workspace view.vw** for a block-based view powered by local sources and safe actions.
+- Open **Team dashboard.nhtml** — it renders in an isolated view tab; use the Source toggle to edit its HTML.
+- Open **Idea board.canvas** — Shift-drag to multi-select, right-click for align/z-order/arrows, Ctrl+Z to undo; cards render Markdown.
+- Press **Ctrl/Cmd + K** and run **New HTMX view in current folder** to create an `.nhtml` view.
+- Read **building-htmx-views** for the API routes, `.neuron` folder layout, and permission model.
 - Click a `#tag` at the bottom of the sidebar to filter.
 - Open **Integrations & Plugins** at the bottom of the sidebar and enable a plugin — its panel appears on the right.

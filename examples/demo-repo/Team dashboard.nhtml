@@ -1,0 +1,39 @@
+<h1>{{ variables.dashboardTitle }}</h1>
+<p>An HTMX view: plain HTML served in an isolated tab, talking to Neuron's
+local API. Edit this file with the <strong>Source</strong> toggle in the tab header.</p>
+
+<section class="neuron-grid cols-3">
+  <div class="neuron-card" hx-get="/api/v1/fragments/workspace-summary" hx-trigger="load" hx-swap="innerHTML">
+    Loading workspace summary…
+  </div>
+  <div class="neuron-card">
+    <div class="neuron-metric-label">Project status</div>
+    <div class="neuron-metric">{{ variables.projectStatus }}</div>
+    <form hx-put="/api/v1/variables/projectStatus" hx-target="closest .neuron-card" hx-swap="none">
+      <input class="neuron-input" name="value" placeholder="active / paused / done" />
+      <button class="neuron-button" style="margin-top:0.5rem" type="submit">Update</button>
+    </form>
+  </div>
+  <div class="neuron-card">
+    <div class="neuron-metric-label">Tags in this workspace</div>
+    <div hx-get="/api/v1/tags" hx-trigger="load" hx-swap="innerHTML">Loading…</div>
+  </div>
+</section>
+
+<section class="neuron-card" hx-get="/api/v1/fragments/project-note" hx-trigger="load" hx-swap="innerHTML">
+  Loading fragment…
+</section>
+
+<section class="neuron-card">
+  <h2>Search notes</h2>
+  <form hx-get="/api/v1/search" hx-target="#search-results"
+        hx-trigger="submit, input changed delay:300ms from:#query">
+    <label for="query">Query</label>
+    <input id="query" class="neuron-input" name="query" type="search" autocomplete="off" placeholder="Try “markdown”" />
+  </form>
+  <div id="search-results"></div>
+</section>
+
+<section class="neuron-card" hx-get="/api/v1/notes?limit=15" hx-trigger="load" hx-swap="innerHTML">
+  Loading recent notes…
+</section>

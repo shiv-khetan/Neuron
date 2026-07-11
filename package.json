@@ -13,7 +13,7 @@
     "dev:main": "tsc -w -p tsconfig.main.json",
     "dev": "concurrently -k -n \"renderer,main,electron\" -c \"blue,yellow,green\" \"npm run dev:renderer\" \"npm run dev:main\" \"node tools/dev/start-electron.js\"",
     "build:renderer": "vite build",
-    "build:main": "tsc -p tsconfig.main.json",
+    "build:main": "tsc -p tsconfig.main.json && node tools/copy-htmx.mjs",
     "build": "npm run clean:build && npm run build:main && npm run build:renderer",
     "dist": "npm run dist:test",
     "dist:test": "node tools/package-env.mjs test",
@@ -21,7 +21,11 @@
     "dist:store": "node tools/package-env.mjs prod --store",
     "release": "node tools/package-env.mjs prod --publish",
     "icon:generate": "node tools/icons/generate-app-icon.js",
-    "test:views": "node tools/view-security.test.mjs"
+    "test:views": "node tools/view-security.test.mjs",
+    "test:frontmatter": "node tools/frontmatter.test.mjs",
+    "test:htmx": "node tools/htmx-views.test.mjs",
+    "test:canvas": "node tools/canvas-model.test.mjs",
+    "test": "npm run test:views && npm run test:frontmatter && npm run test:htmx && npm run test:canvas"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.2.5",
@@ -68,6 +72,7 @@
     "date-fns": "^4.4.0",
     "electron-updater": "^6.8.9",
     "embla-carousel-react": "^8.6.0",
+    "htmx.org": "^2.0.10",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.395.0",
     "next-themes": "^0.4.6",
@@ -80,7 +85,8 @@
     "sonner": "^2.0.7",
     "sql.js": "^1.14.1",
     "tailwind-merge": "^2.4.0",
-    "vaul": "^1.1.2"
+    "vaul": "^1.1.2",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.2",

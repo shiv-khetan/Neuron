@@ -1,18 +1,117 @@
 {
 	"nodes": [
-		{ "id": "theme", "type": "text", "x": -140, "y": -320, "width": 300, "height": 90, "color": "6", "text": "# Neuron 1.1\nSpatial thinking meets plain files." },
-		{ "id": "grp-ship", "type": "group", "x": -420, "y": -140, "width": 400, "height": 330, "color": "4", "label": "Shipped" },
-		{ "id": "db", "type": "text", "x": -390, "y": -90, "width": 340, "height": 100, "color": "4", "text": "Notion-style .db databases — typed properties, colored tags, filters." },
-		{ "id": "views", "type": "file", "x": -390, "y": 30, "width": 340, "height": 140, "file": "building-uis-and-dashboards.mdx" },
-		{ "id": "grp-next", "type": "group", "x": 60, "y": -140, "width": 400, "height": 330, "color": "2", "label": "Exploring" },
-		{ "id": "canvas-idea", "type": "text", "x": 90, "y": -90, "width": 340, "height": 90, "color": "2", "text": "Embed canvases inside notes?" },
-		{ "id": "jsoncanvas", "type": "link", "x": 90, "y": 30, "width": 340, "height": 80, "url": "https://jsoncanvas.org" },
-		{ "id": "tasks", "type": "file", "x": -140, "y": 260, "width": 300, "height": 120, "file": "Projects.db" }
+		{
+			"id": "theme",
+			"type": "text",
+			"x": -140,
+			"y": -320,
+			"width": 300,
+			"height": 90,
+			"color": "6",
+			"text": "# Neuron 1.1\nSpatial thinking meets plain files."
+		},
+		{
+			"id": "grp-ship",
+			"type": "group",
+			"x": -420,
+			"y": -140,
+			"width": 400,
+			"height": 330,
+			"color": "4",
+			"label": "Shipped"
+		},
+		{
+			"id": "db",
+			"type": "text",
+			"x": -390,
+			"y": -90,
+			"width": 340,
+			"height": 100,
+			"color": "4",
+			"text": "Notion-style .db databases — typed properties, colored tags, filters."
+		},
+		{
+			"id": "views",
+			"type": "file",
+			"x": -390,
+			"y": 30,
+			"width": 340,
+			"height": 140,
+			"file": "building-htmx-views.mdx"
+		},
+		{
+			"id": "grp-next",
+			"type": "group",
+			"x": 60,
+			"y": -140,
+			"width": 400,
+			"height": 330,
+			"color": "2",
+			"label": "Exploring"
+		},
+		{
+			"id": "canvas-idea",
+			"type": "text",
+			"x": 90,
+			"y": -90,
+			"width": 340,
+			"height": 90,
+			"color": "2",
+			"text": "Embed canvases inside notes?"
+		},
+		{
+			"id": "jsoncanvas",
+			"type": "link",
+			"x": -846,
+			"y": 815,
+			"width": 340,
+			"height": 80,
+			"url": "https://jsoncanvas.org"
+		},
+		{
+			"id": "tasks",
+			"type": "file",
+			"x": -140,
+			"y": 260,
+			"width": 300,
+			"height": 120,
+			"file": "Projects.db"
+		}
 	],
 	"edges": [
-		{ "id": "e1", "fromNode": "theme", "fromSide": "left", "toNode": "grp-ship", "toSide": "top", "color": "4", "label": "done" },
-		{ "id": "e2", "fromNode": "theme", "fromSide": "right", "toNode": "grp-next", "toSide": "top", "color": "2", "label": "next" },
-		{ "id": "e3", "fromNode": "db", "fromSide": "bottom", "toNode": "tasks", "toSide": "left", "label": "tracked in" },
-		{ "id": "e4", "fromNode": "canvas-idea", "fromSide": "bottom", "toNode": "jsoncanvas", "toSide": "top", "label": "format" }
+		{
+			"id": "e1",
+			"fromNode": "theme",
+			"fromSide": "left",
+			"toNode": "grp-ship",
+			"toSide": "top",
+			"color": "4",
+			"label": "done"
+		},
+		{
+			"id": "e2",
+			"fromNode": "theme",
+			"fromSide": "right",
+			"toNode": "grp-next",
+			"toSide": "top",
+			"color": "2",
+			"label": "next"
+		},
+		{
+			"id": "e3",
+			"fromNode": "db",
+			"fromSide": "bottom",
+			"toNode": "tasks",
+			"toSide": "left",
+			"label": "tracked in"
+		},
+		{
+			"id": "e4",
+			"fromNode": "canvas-idea",
+			"fromSide": "bottom",
+			"toNode": "jsoncanvas",
+			"toSide": "top",
+			"label": "format"
+		}
 	]
 }

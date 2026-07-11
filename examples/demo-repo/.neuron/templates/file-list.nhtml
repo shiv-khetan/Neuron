@@ -1,0 +1,2 @@
+<h1>Workspace files</h1>
+<section class="neuron-card" hx-get="/api/v1/files?limit=50" hx-trigger="load" hx-swap="innerHTML">Loading files…</section>

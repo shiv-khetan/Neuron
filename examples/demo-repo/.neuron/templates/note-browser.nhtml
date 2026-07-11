@@ -1,0 +1,9 @@
+<h1>Note browser</h1>
+<section class="neuron-card">
+  <form hx-get="/api/v1/search" hx-target="#results" hx-trigger="submit, input changed delay:300ms from:#q">
+    <label for="q">Search notes</label>
+    <input id="q" class="neuron-input" name="query" type="search" autocomplete="off" />
+  </form>
+  <div id="results"></div>
+</section>
+<section class="neuron-card" hx-get="/api/v1/notes?limit=25" hx-trigger="load" hx-swap="innerHTML">Loading notes…</section>

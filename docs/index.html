@@ -1116,7 +1116,7 @@
                 </div>
                 <div class="mockup-tabs" role="tablist" aria-label="Preview a surface">
                   <button class="mockup-tab" role="tab" aria-selected="true" data-pane="pane-note">features.mdx</button>
-                  <button class="mockup-tab" role="tab" aria-selected="false" data-pane="pane-dash">Dashboard.vw</button>
+                  <button class="mockup-tab" role="tab" aria-selected="false" data-pane="pane-dash">Dashboard.nhtml</button>
                   <button class="mockup-tab" role="tab" aria-selected="false" data-pane="pane-canvas">Ideas.canvas</button>
                 </div>
               </div>
@@ -1190,7 +1190,7 @@
                     </g>
                     <g>
                       <rect class="cnv-node" x="235" y="120" width="130" height="56" rx="8" />
-                      <text class="cnv-label" x="251" y="144">Dashboards.vw</text>
+                      <text class="cnv-label" x="251" y="144">Dashboards.nhtml</text>
                       <text class="cnv-label" x="251" y="162">bento blocks</text>
                     </g>
                     <g>
@@ -1306,7 +1306,7 @@
               <div class="bento-inner">
                 <div>
                   <h3>Dashboards from plain files</h3>
-                  <p><code style="color: var(--accent); font-family: 'Geist Mono', monospace; font-size: 13px;">.vw</code> views turn HTML + live blocks into bento dashboards — charts, metrics, heatmaps, and editable CSV tables.</p>
+                  <p><code style="color: var(--accent); font-family: 'Geist Mono', monospace; font-size: 13px;">.nhtml</code> views turn plain HTML + htmx into live local dashboards, powered by a secure workspace API.</p>
                 </div>
                 <div class="bento-visual">
                   <div class="feature-list-visual">
@@ -1539,7 +1539,7 @@
 
       // --- Typewriter line in the editor pane ---------------------------------
       const typeline = document.getElementById('typeline');
-      const PHRASES = ['Plain files. Zero lock-in.', 'Dashboards from .vw views.', 'Boards from .canvas files.', 'Databases from .db files.'];
+      const PHRASES = ['Plain files. Zero lock-in.', 'Dashboards from .nhtml views.', 'Boards from .canvas files.', 'Databases from .db files.'];
       if (reducedMotion) {
         typeline.textContent = PHRASES[0];
       } else {

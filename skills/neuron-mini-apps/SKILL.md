@@ -1,103 +1,108 @@
 ---
 name: neuron-mini-apps
-description: Build mini apps (dashboards, trackers, tables, galleries) inside a Neuron workspace using .vw view files, CSV-backed editable databases, and trusted action buttons. Use when asked to create a dashboard, tracker, database, or interactive view in Neuron.
+description: Build mini apps (dashboards, trackers, tables, galleries) inside a Neuron workspace using .nhtml HTMX views, .db Notion-style databases, and .canvas boards. Use when asked to create a dashboard, tracker, database, or interactive view in Neuron.
 ---
 
 # Building mini apps in Neuron
 
 A Neuron **workspace** is a plain folder of files. A mini app is just files in
-that folder — no build step, no server, no localStorage:
+that folder — no build step, no bundler, no localStorage:
 
-- **`.vw` files** — the UI. HTML with Tailwind classes, rendered live.
-- **`.csv` files** — simple tabular data. Views read AND write them (two-way sync).
+- **`.nhtml` files** — the UI. Plain HTML with [htmx](https://htmx.org)
+  attributes, rendered in an isolated view tab against Neuron's local API.
 - **`.db` files** — Notion-style databases: typed properties, colored select tags, filters (schema below).
-- **`.canvas` files** — infinite whiteboards in the open JSON Canvas format (Obsidian-compatible): text/file/link cards, labelled groups, colored + labelled arrows.
+- **`.canvas` files** — infinite whiteboards in the open JSON Canvas format (Obsidian-compatible).
 - **`.md`/`.mdx` files** — notes/docs, linkable with `[[wikilinks]]`.
-- **Automations** — named command sequences a button can run.
+- **`.neuron/` folder** — variables, reusable fragments, styles, templates, and per-view manifests.
 
-Create a mini app by writing a `.vw` file (any path, e.g. `Habit tracker.vw`)
-and, if it needs data, a CSV (convention: `data/name.csv`, first row = headers)
-or a `.db` database for typed/structured records.
+## The .nhtml format
 
-## The .vw format
+A view file is HTML **body content** (no `<html>`/`<head>`). Neuron wraps it,
+injects the bundled htmx runtime and the `neuron.css` design system, and
+serves it from a loopback server. Auth is automatic (an HttpOnly session
+cookie) — never put tokens in the file.
 
-Plain HTML. Standard tags render as themselves with `class` passed through —
-use Tailwind for all layout (`grid grid-cols-3 gap-4`, `flex`, etc.).
+Interactivity comes from htmx attributes (`hx-get`, `hx-post`, `hx-put`,
+`hx-delete`, `hx-trigger`, `hx-target`, `hx-swap`, `hx-include`, `hx-vals`)
+pointed at `/api/v1/...`. `<script>` never executes (strict CSP), and views
+have **no network access** — everything is local.
 
-Allowed native tags: div, section, header, footer, main, article, aside, nav,
-span, p, a, strong, em, b, i, u, s, small, code, pre, blockquote, ul, ol, li,
-hr, br, img, h1–h6, table, thead, tbody, tr, td, th, label, button.
-`<script>`, `<style>`, and `<iframe>` are stripped — interactivity comes from
-the custom tags below. Links (`<a href>`) open in the external browser.
+Design-system classes: `neuron-card`, `neuron-button` (+ `.secondary`),
+`neuron-input`, `neuron-table`, `neuron-badge`, `neuron-stack`,
+`neuron-grid` (+ `cols-2/3/4`), `neuron-toolbar`, `neuron-alert`,
+`neuron-empty`, `neuron-metric`, `neuron-metric-label`, `neuron-list`.
+They track the app's light/dark theme. Inline `style` attributes are allowed
+for fine-tuning.
 
-## Custom tags
+`{{ variables.name }}` interpolates a variable from `.neuron/variables.json`,
+HTML-escaped. Key lookup only — no expressions.
 
-| Tag | Purpose |
+## API routes
+
+| Route | Purpose |
 | --- | --- |
-| `<metric title="…" value="…" hint="…" />` | Hand-curated stat tile |
-| `<filecount title glob="*.mdx" />` | Live count of workspace files |
-| `<filegraph title glob />` | Bar chart of files by type |
-| `<filetable title glob limit="10" />` | Table of file metadata |
-| `<csvtable title src="data/tasks.csv" />` (alias `<database>`) | **Editable** Notion-style table backed by a CSV — edit cells, add/delete rows, add columns, sort; every edit saves back to the file |
-| `<progress label value="3" max="5" />` | Labeled progress bar |
-| `<stat label value delta="+34" sub="…" />` | Metric with colored up/down delta |
-| `<barchart>` / `<linechart>` / `<areachart>` | Chart from a CSV (`src`, `x`, `y` column names) or inline `data='[{"name":"Mon","value":3}]'` |
-| `<heatmap src="data/habits.csv" date="date" value="count" />` | GitHub-style contribution grid |
-| `<gallery title glob="*.png" limit="60" />` | Grid of workspace images |
-| `<listview title glob="*.mdx" limit="100" />` | Clickable file list; notes open in the editor |
-| `<folderview title path="daily" />` | Files grouped by folder, clickable |
-| `<bookmark url title description />` (alias `<linkpreview>`) | Link card with favicon |
-| `<card title>…children…</card>` | Titled block wrapper |
-| `<task checked>Label</task>` | Checklist row |
-| `<button label action="…" />` | Trusted action button (below) |
+| `GET /api/v1/context` | View, workspace, theme, granted capabilities |
+| `GET /api/v1/search?query=…` | Note search (HTML fragment for htmx targets) |
+| `GET /api/v1/notes?tag=…&folder=…&limit=…` | Note metadata table |
+| `GET /api/v1/tags` | Tag badges |
+| `GET /api/v1/files?dir=…&glob=…&limit=…` | File listing |
+| `GET /api/v1/files/content?path=…` | Read a file → `{path, content, hash}` |
+| `PUT /api/v1/files/content` | Update (`{path, content, baseHash}`; 409 on conflict) |
+| `POST /api/v1/files` | Create (`{path, content}`) |
+| `DELETE /api/v1/files?path=…` | Delete |
+| `GET/PUT /api/v1/variables/:key` | Read / update a writable variable |
+| `GET /api/v1/fragments/:name?param=…` | Render `.neuron/fragments/<name>.html` |
 
-Every view tag accepts `class` for grid placement (`col-span-*`, `row-span-*`).
-**Lay dashboards out as a 12-column bento grid, not a vertical stack**: one
-`grid grid-cols-2 lg:grid-cols-12 gap-4` wrapper, stat tiles at `lg:col-span-3`,
-one wide anchor block per row (e.g. `lg:col-span-8` chart + `lg:col-span-4`
-rail). Safelisted utilities (always available in any workspace): grid/flex
-layout, spans, gaps, spacing, sizing, text/font, rounded/border — with
-`sm: md: lg: xl:` variants on the grid utilities.
+GET routes return HTML fragments when called from htmx, JSON otherwise.
 
-## Button actions (what makes it an app)
+## Permissions
 
-```html
-<button label="Open in VS Code" action="openInVSCode" />
-<button label="Reveal folder" action="reveal" path="data" />
-<button label="Open the log" action="open" path="daily/log.mdx" />
-<button label="New scratch note" action="createFile" path="scratch.md" content="# Scratch" />
-<button label="Sync" automation="Pull latest" />
+Views are **read-only by default**. Writing needs a manifest next to the view
+(`Tracker.nhtml` → `Tracker.neuron.json`):
+
+```json
+{
+  "name": "Tracker",
+  "permissions": ["workspace.files.read", "workspace.files.write", "workspace.files.create", "variables.read"],
+  "allowedReadPaths": ["data/**"],
+  "allowedWritePaths": ["data/**"],
+  "networkPolicy": "none"
+}
 ```
 
-- `open` — opens a workspace note in the editor.
-- `createFile` — creates the file (with optional `content`) if missing, then opens it. Paths are confined to the workspace.
-- `automation="Name"` — runs a saved automation (a named list of shell commands the user created in the Automations panel). Use for anything else: git sync, scripts, exports.
+Capabilities: `workspace.files.read/write/create/delete`,
+`workspace.directories.list`, `workspace.search`, `notes.read`, `tags.read`,
+`variables.read/write`. Request the minimum; write permissions show the user
+an approval dialog. Unknown fields/permissions are rejected. Scope
+`allowedWritePaths` as tightly as possible (ideally one file or folder).
 
 ## Recipe: a tracker mini app
 
-`data/reading.csv`:
-```csv
-date,book,pages
-2026-07-01,Dune,40
-```
-
-`Reading tracker.vw`:
+`Reading tracker.nhtml`:
 ```html
 <h1>Reading tracker</h1>
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-  <stat label="This week" value="180" delta="+40" sub="pages" />
-  <progress label="Monthly goal" value="180" max="600" />
-  <linechart title="Pages per day" src="data/reading.csv" x="date" y="pages" />
-</div>
-<csvtable title="Log" src="data/reading.csv" />
-<div class="flex gap-3">
-  <button label="New book note" action="createFile" path="books/new-book.mdx" content="# Book notes" />
-</div>
+<section class="neuron-grid cols-3">
+  <div class="neuron-card" hx-get="/api/v1/fragments/workspace-summary" hx-trigger="load" hx-swap="innerHTML">Loading…</div>
+  <div class="neuron-card">
+    <div class="neuron-metric-label">Status</div>
+    <div class="neuron-metric">{{ variables.projectStatus }}</div>
+  </div>
+  <div class="neuron-card" hx-get="/api/v1/files?dir=books&limit=20" hx-trigger="load" hx-swap="innerHTML">Loading…</div>
+</section>
+
+<section class="neuron-card">
+  <form hx-get="/api/v1/search" hx-target="#results"
+        hx-trigger="submit, input changed delay:300ms from:#q">
+    <label for="q">Find a book note</label>
+    <input id="q" class="neuron-input" name="query" type="search" autocomplete="off" />
+  </form>
+  <div id="results"></div>
+</section>
 ```
 
-The `<csvtable>` is the edit surface — the user logs entries there and the
-charts/stats read the same file. That loop (CSV as state, view as UI, buttons
-as verbs) is the whole pattern.
+Pattern: workspace files as state, the view as UI, htmx requests as verbs.
+For typed/records data, pair the view with a `.db` file the user edits in its
+own tab; the view reads it via `/api/v1/files/content`.
 
 ## .db databases (Notion-style)
 
@@ -125,9 +130,10 @@ A `.db` file opens as a fully editable database table. It is one JSON document:
 - Option `color` is any CSS color (the app palette: `#8b8b8b #a27763 #e28f44 #d9b23c #5aa06c #528fd1 #9a6dd7 #d15796 #dd5c5c`).
 - `view` persists sort and filter; the UI writes it back as the user changes them.
 - Users can add/rename/retype/reorder/delete properties and options entirely from the GUI — when generating a `.db`, just provide a sensible starting schema and rows.
-- The app watches the file: external edits (scripts, git, agents editing the JSON) appear live in the open table. An empty `.db` file shows an "Initialize database" button.
+- The app watches the file: external edits appear live in the open table.
 
-Prefer `.db` over CSV when records need types, colored tags, or filtering; prefer CSV when other blocks (charts, heatmaps) must read the same data.
+Prefer `.db` when records need types, colored tags, or filtering; prefer plain
+files read through the API when an `.nhtml` view must present the data.
 
 ## .canvas boards (JSON Canvas)
 
@@ -136,12 +142,12 @@ A `.canvas` file is `{ "nodes": [...], "edges": [...] }` per [jsoncanvas.org](ht
 - Node types: `text` (markdown in `text`), `file` (workspace path in `file`), `link` (`url`), `group` (`label`). All have `id`, `x`, `y`, `width`, `height`, optional `color`.
 - Edges: `{ id, fromNode, fromSide, toNode, toSide, label?, color? }` with sides `top|right|bottom|left`.
 - `color` is `"1"`–`"6"` (red, orange, yellow, green, cyan, purple) or any CSS color.
-- When generating a canvas, lay cards out on a rough grid (~300×150 cards, 60+px gaps), put groups behind the cards they contain (a group contains a card when the card's rect is fully inside), and label edges with the relationship ("causes", "supports", "example of").
+- When generating a canvas, lay cards out on a rough grid (~300×150 cards, 60+px gaps), put groups behind the cards they contain, and label edges with the relationship ("causes", "supports", "example of").
 
 ## Rules
 
-- All persistent state goes in workspace files (CSV/MD). Never suggest localStorage, external databases, or embedded JS.
-- Use standard formats: CSV with a header row; Markdown/MDX for prose.
-- Keep views flat: tiles on a grid, not nested card-in-card.
-- Column names referenced by `x`, `y`, `date`, `value` must match CSV headers exactly.
-- Relative paths (`src`, `path`) resolve from the workspace root.
+- All persistent state goes in workspace files. Never suggest localStorage, external databases, or embedded JS.
+- No `<script>` in views — it will not run. Interactivity is htmx + server fragments.
+- Request the minimum capabilities and the tightest path scopes in manifests.
+- Relative data paths in API calls resolve from the workspace root.
+- Reusable partials go in `.neuron/fragments/`; per-view CSS in `.neuron/styles/<view name>.css`.

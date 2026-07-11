@@ -10,11 +10,83 @@ import type { EditorState, Range } from '@codemirror/state';
 import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { Badge, Callout, parseSemanticType, MarkdownTable, parseMarkdownTable } from './mdx-components';
+import DocumentProperties from './properties/DocumentProperties';
+import { parseFrontmatter } from '../lib/frontmatter';
 
 interface LiveEditorProps {
   value: string;
   onChange: (value: string) => void;
   colorScheme?: 'dark' | 'light';
+  tagSuggestions?: string[];
+  onTagClick?: (tag: string) => void;
+  onRequestRawMode?: () => void; // escape hatch: edit frontmatter as YAML
+  removeEmptyFrontmatter?: boolean;
+  defaultPropertiesCollapsed?: boolean;
+}
+
+// Config the frontmatter widget reads at render time. The live editor is a
+// singleton in this app (only mounted for editorMode === 'live'), so a module
+// holder is enough.
+// ponytail: single-instance holder; move to a CM Facet if a second LiveEditor
+// is ever mounted concurrently.
+interface FmConfig {
+  tagSuggestions: string[];
+  onTagClick?: (tag: string) => void;
+  onRequestRawMode?: () => void;
+  removeEmpty: boolean;
+  defaultCollapsed: boolean;
+}
+let fmConfig: FmConfig = { tagSuggestions: [], removeEmpty: true, defaultCollapsed: false };
+
+// Replace ONLY the frontmatter block, leaving the body untouched so caret,
+// selection and undo history in the body survive. `next` is the full document
+// produced by the serializer (block + identical body).
+function applyFrontmatter(view: EditorView, next: string) {
+  const cur = view.state.doc.toString();
+  if (next === cur) return;
+  const parsed = parseFrontmatter(cur);
+  const body = parsed.body;
+  const newBlock = next.length >= body.length ? next.slice(0, next.length - body.length) : next;
+  view.dispatch({ changes: { from: 0, to: parsed.bodyStart, insert: newBlock } });
+}
+
+class FrontmatterWidget extends WidgetType {
+  private root: Root | null = null;
+  private observer: ResizeObserver | null = null;
+  constructor(private readonly raw: string) { super(); }
+  // Re-render only when the frontmatter text changes; body edits (and collapse
+  // toggles, which are React-internal) reuse the existing DOM so the panel
+  // never remounts nor steals focus.
+  eq(other: FrontmatterWidget) { return other.raw === this.raw; }
+  toDOM(view: EditorView) {
+    const wrap = document.createElement('div');
+    wrap.className = 'cm-fm-widget';
+    wrap.setAttribute('contenteditable', 'false');
+    this.root = createRoot(wrap);
+    this.root.render(
+      <DocumentProperties
+        doc={view.state.doc.toString()}
+        onChangeDoc={(nextDoc) => applyFrontmatter(view, nextDoc)}
+        onViewRaw={fmConfig.onRequestRawMode}
+        tagSuggestions={fmConfig.tagSuggestions}
+        onTagClick={fmConfig.onTagClick}
+        removeEmpty={fmConfig.removeEmpty}
+        defaultCollapsed={fmConfig.defaultCollapsed}
+      />,
+    );
+    this.observer = new ResizeObserver(() => view.requestMeasure());
+    this.observer.observe(wrap);
+    queueMicrotask(() => view.requestMeasure());
+    return wrap;
+  }
+  destroy() {
+    this.observer?.disconnect();
+    this.observer = null;
+    const root = this.root;
+    this.root = null;
+    if (root) queueMicrotask(() => root.unmount());
+  }
+  ignoreEvent() { return true; } // form inputs handle their own events
 }
 
 // A CodeMirror widget that mounts a React component. The component is rendered
@@ -168,6 +240,16 @@ function buildDecorations(state: EditorState): DecorationSet {
   const text = doc.toString();
   const caretInside = (from: number, to: number) => sel.from <= to && sel.to >= from;
   const isOccupied = (from: number, to: number) => occupied.some((o) => overlaps(from, to, o.from, o.to));
+
+  // --- Frontmatter: hide the raw YAML + delimiters, mount the properties panel.
+  // Only when valid — invalid YAML stays visible so the user can fix it inline.
+  const fm = parseFrontmatter(text);
+  if (fm.hasFrontmatter && fm.valid && fm.bodyStart > 0) {
+    occupied.push({ from: 0, to: fm.bodyStart });
+    ranges.push(
+      Decoration.replace({ widget: new FrontmatterWidget(fm.raw), block: true }).range(0, fm.bodyStart),
+    );
+  }
 
   // --- Fenced code blocks: treat as occupied (no live styling inside) ---------
   let inFence = false;
@@ -346,8 +428,12 @@ const liveEditorField = StateField.define<DecorationSet>({
   provide: (field) => EditorView.decorations.from(field),
 });
 
-export default function LiveEditor({ value, onChange, colorScheme = 'dark' }: LiveEditorProps) {
+export default function LiveEditor({ value, onChange, colorScheme = 'dark', tagSuggestions = [], onTagClick, onRequestRawMode, removeEmptyFrontmatter = true, defaultPropertiesCollapsed = false }: LiveEditorProps) {
   const editorRef = useRef<any>(null);
+
+  // Keep the frontmatter widget's config current without re-creating editor
+  // extensions (which would reset editor state).
+  fmConfig = { tagSuggestions, onTagClick, onRequestRawMode, removeEmpty: removeEmptyFrontmatter, defaultCollapsed: defaultPropertiesCollapsed };
 
   const extensions = useMemo(
     () => [

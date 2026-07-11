@@ -15,6 +15,7 @@ module.exports = {
   asar: true,
   asarUnpack: [
     '**/node_modules/node-pty/**',
+    '**/node_modules/sql.js/dist/sql-wasm.wasm',
   ],
   npmRebuild: false,
   directories: {

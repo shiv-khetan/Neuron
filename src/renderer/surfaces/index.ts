@@ -45,7 +45,7 @@ export function getSurface(path: string): Surface | undefined {
 }
 
 /** Extensions that are special surfaces (used to label/route in the UI). */
-export const SURFACE_EXTENSIONS = ['vw', 'db', 'canvas'] as const;
+export const SURFACE_EXTENSIONS = ['nhtml', 'db', 'canvas'] as const;
 
 /** True if a path is any special surface file. */
 export function isSurfaceFile(path: string): boolean {

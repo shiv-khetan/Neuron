@@ -18,13 +18,17 @@ The React renderer owns workspace state, navigation, note tabs, CodeMirror editi
 
 ## Notes and repositories
 
-A repository is an ordinary folder. Neuron scans `.md`, `.mdx`, and `.vw` files, stores paths relative to the selected repository, and writes text without converting the document into a proprietary format. Chokidar reports external changes back to the renderer.
+A repository is an ordinary folder. Neuron scans `.md`, `.mdx`, `.nhtml`, `.db`, `.canvas`, and `.neuron` configuration files, stores paths relative to the selected repository, and writes text without converting the document into a proprietary format. Chokidar reports external changes back to the renderer.
 
 ## File-driven surfaces
 
-`.vw` files are small JSON *declarations*, not stored render output. Opening one renders a block view instead of the Markdown editor. `src/renderer/surfaces/` holds the registry: `getSurface(path)` maps the `.vw` extension to `ViewSurface`. View blocks can render static text and metrics, fetch local repository sources for file counts and tables, draw charts, show checklists, and run trusted named actions such as opening the active repository in VS Code.
+`src/renderer/surfaces/` holds the registry: `getSurface(path)` maps a file extension to a surface component that replaces the Markdown editor. `.db` renders a Notion-style database, `.canvas` a JSON Canvas board, and `.nhtml` an HTMX view — user-authored HTML rendered in an isolated webview against a token-authenticated loopback API (see [htmx-views.md](htmx-views.md)).
 
 `neuron.config` is still supported as the internal workspace shell layout. It uses the same layout parser and panel renderers, but it is not a public surface extension.
+
+## HTMX view server
+
+`src/main/htmx/` implements the local view server: loopback-only, ephemeral port, per-view session tokens, capability manifests with default-deny permissions, and glob path policies. The server module is Electron-free and covered by `tools/htmx-views.test.mjs`.
 
 ## Terminal and automations
 

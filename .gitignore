@@ -19,6 +19,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .cache/
+.npm-cache/
 .vite/
 .DS_Store
 Thumbs.db

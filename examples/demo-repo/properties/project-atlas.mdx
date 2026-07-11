@@ -1,0 +1,32 @@
+---
+title: Project Atlas
+tags:
+  - project
+  - active
+status: In Progress
+priority: High
+due: 2026-07-30
+completed: false
+rating: 4
+aliases:
+  - Atlas
+  - Project A
+---
+
+import { Callout } from '../components'
+
+# Project Atlas
+
+The frontmatter above renders as an editable **Properties** panel in reading and
+live modes — the raw YAML and `---` delimiters stay hidden. Switch to **Edit as
+raw file (split)** from the view menu to see and edit the underlying YAML.
+
+<Callout type="info" title="Try it">
+Edit a property in the panel, then open the raw view — only the frontmatter
+block changed. The body you are reading is preserved exactly.
+</Callout>
+
+## Notes
+
+- `tags` and `aliases` accept scalar or list form.
+- `due` is inferred as a date; `completed` as a checkbox; `rating` as a number.

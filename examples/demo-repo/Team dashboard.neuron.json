@@ -1,0 +1,17 @@
+{
+  "name": "Team dashboard",
+  "version": "1.0.0",
+  "description": "Demo dashboard: workspace summary, search, and an editable status variable.",
+  "permissions": [
+    "workspace.files.read",
+    "workspace.directories.list",
+    "workspace.search",
+    "notes.read",
+    "tags.read",
+    "variables.read",
+    "variables.write"
+  ],
+  "allowedReadPaths": ["**"],
+  "allowedWritePaths": [".neuron/variables.json"],
+  "networkPolicy": "none"
+}

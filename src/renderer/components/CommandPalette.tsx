@@ -30,7 +30,7 @@ export default function CommandPalette({ open, onOpenChange, notes, onSelectNote
 
         <CommandGroup heading="Actions">
           <CommandItem onSelect={() => { onCreate(); close(); }}><FolderPlus /> Create note or section</CommandItem>
-          <CommandItem onSelect={() => { onCreateSurface(); close(); }}><SquareStack /> New block view in current folder</CommandItem>
+          <CommandItem onSelect={() => { onCreateSurface(); close(); }}><SquareStack /> New HTMX view in current folder</CommandItem>
           <CommandItem onSelect={() => { onToggleShell(); close(); }}><PanelsTopLeft /> {shellActive ? 'Hide workspace layout' : 'Use workspace layout (.neuron/layout.json)'}</CommandItem>
           <CommandItem onSelect={() => { onOpenWebsite(); close(); }}><Globe /> Open website tab</CommandItem>
           <CommandItem onSelect={() => { onImportChromeLogins(); close(); }}><Chrome /> Import Chrome logins</CommandItem>

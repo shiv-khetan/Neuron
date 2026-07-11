@@ -82,10 +82,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
   views: {
-    source: (request: { type: string; glob?: string; limit?: number }) => ipcRenderer.invoke('views:source', request),
-    action: (action: { type: string; path?: string; content?: string }) => ipcRenderer.invoke('views:action', action),
-    csv: (relativePath: string) => ipcRenderer.invoke('views:csv', relativePath),
     file: (relativePath: string) => ipcRenderer.invoke('views:file', relativePath),
+  },
+  htmxViews: {
+    open: (relativePath: string, theme?: 'light' | 'dark') => ipcRenderer.invoke('htmx-views:open', relativePath, theme),
+    approve: (relativePath: string, scope: 'always' | 'once') => ipcRenderer.invoke('htmx-views:approve', relativePath, scope),
+    close: (sessionId: string) => ipcRenderer.invoke('htmx-views:close', sessionId),
+    resetApproval: (relativePath: string) => ipcRenderer.invoke('htmx-views:reset-approval', relativePath),
   },
   cookies: {
     importChrome: (domain?: string) => ipcRenderer.invoke('cookies:import-chrome', domain),

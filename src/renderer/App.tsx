@@ -23,7 +23,7 @@ import { builtinPlugins } from './plugins/builtin';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { getSurface } from './surfaces';
 import LayoutSurface from './surfaces/LayoutSurface';
-import './surfaces/ViewSurface'; // registers the .vw block view surface
+import './surfaces/HtmxViewSurface'; // registers the .nhtml HTMX view surface
 import './surfaces/DbSurface'; // registers the .db database surface
 import './surfaces/CanvasSurface'; // registers the .canvas JSON Canvas surface
 import { SurfaceBoundary } from './surfaces/SurfaceBoundary';
@@ -31,6 +31,10 @@ import BrowserView from './components/BrowserView';
 import { DEFAULT_BINDINGS, eventToChord, resolveBindings, type Bindings } from './lib/keybindings';
 import { DEFAULT_LAYOUT, resolveLayout, type WorkbenchLayout } from './lib/layout';
 import ActivityRail, { type SidebarMode } from './components/ActivityRail';
+import { parseFrontmatter, normalizeStringList } from './lib/frontmatter';
+
+interface PropertiesSettings { removeEmpty: boolean; showInReading: boolean; collapsedByDefault: boolean }
+const DEFAULT_PROPERTIES_SETTINGS: PropertiesSettings = { removeEmpty: true, showInReading: true, collapsedByDefault: false };
 
 const isUrl = (s: string | null): s is string => !!s && /^https?:\/\//.test(s);
 
@@ -44,27 +48,26 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 type View = 'notes' | 'repositories' | 'plugins' | 'settings' | 'gallery';
 type EditorMode = 'live' | 'raw' | 'reading';
 
-// Default content for .vw file-driven block views.
-const VIEW_TEMPLATE = `<h1>Workspace view</h1>
-<p>.vw views are HTML with Tailwind classes. Use layout utilities like
-<code>grid</code> and <code>flex</code>, plus view tags such as
-<code>&lt;metric&gt;</code>, <code>&lt;filegraph&gt;</code>, and <code>&lt;csvtable&gt;</code>.</p>
+// Default content for new .nhtml HTMX views. Plain HTML + htmx attributes;
+// Neuron serves it from the local view server with the neuron-view stylesheet.
+const HTMX_VIEW_TEMPLATE = `<h1>New HTMX view</h1>
+<p>This is ordinary HTML with <a href="https://htmx.org">htmx</a> attributes.
+It talks to Neuron's local API — see <code>GET /api/v1/context</code>.</p>
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-  <metric title="Status" value="Ready" hint="Hand-curated value." />
-  <filecount title="Markdown notes" glob="*.mdx" />
-  <filecount title="View files" glob="*.vw" />
-</div>
+<section class="neuron-grid cols-3">
+  <div class="neuron-card" hx-get="/api/v1/fragments/workspace-summary" hx-trigger="load" hx-swap="innerHTML">
+    Loading…
+  </div>
+</section>
 
-<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-  <filegraph title="Files by type" />
-  <filetable title="Recent files" limit="10" />
-</div>
-
-<div class="flex flex-wrap gap-3">
-  <button label="Open workspace in VS Code" action="openInVSCode" />
-  <button label="Reveal workspace" action="reveal" />
-</div>
+<section class="neuron-card">
+  <form hx-get="/api/v1/search" hx-target="#search-results"
+        hx-trigger="submit, input changed delay:300ms from:#query">
+    <label for="query">Search notes</label>
+    <input id="query" class="neuron-input" name="query" type="search" autocomplete="off" />
+  </form>
+  <div id="search-results"></div>
+</section>
 `;
 
 const NEURON_CONFIG_TEMPLATE = `{
@@ -129,6 +132,14 @@ export default function App() {
     void window.electronAPI?.settings.get<Partial<WorkbenchLayout>>('layout').then((stored) => {
       if (stored) setLayout(resolveLayout(stored));
     });
+    void window.electronAPI?.settings.get<Partial<PropertiesSettings>>('properties').then((stored) => {
+      if (stored) setPropsSettings({ ...DEFAULT_PROPERTIES_SETTINGS, ...stored });
+    });
+  }, []);
+
+  const updatePropsSettings = useCallback((next: PropertiesSettings) => {
+    setPropsSettings(next);
+    void window.electronAPI?.settings.set('properties', next);
   }, []);
 
   const sidebarOpen = layout.sidebar;
@@ -146,6 +157,7 @@ export default function App() {
   const [surfaceSourceMode, setSurfaceSourceMode] = useState<Record<string, boolean>>({});
   const [shellConfig, setShellConfig] = useState<string | null>(null);
   const [pendingShellConfig, setPendingShellConfig] = useState<string | null>(null);
+  const [propsSettings, setPropsSettings] = useState<PropertiesSettings>(DEFAULT_PROPERTIES_SETTINGS);
 
   const saveVersion = useRef(0);
   const editorRef = useRef<any>(null);
@@ -221,12 +233,16 @@ export default function App() {
       setNotesData(data);
       const allTags = new Set<string>();
       data.forEach((note) => {
+        // Body #tags…
         const tagRegex = /(?:^|\s)#([A-Za-z0-9_-]+)(?=\s|$|\.|,)/g;
         let match;
         while ((match = tagRegex.exec(note.content)) !== null) {
           const tag = match[1];
           if (!/^[0-9a-fA-F]{3,6}$/.test(tag) && !/^\d+$/.test(tag)) allTags.add(tag);
         }
+        // …plus frontmatter tags (scalar or list form).
+        const fm = parseFrontmatter(note.content);
+        if (fm.valid && fm.data.tags != null) normalizeStringList(fm.data.tags).forEach((t) => allTags.add(t));
       });
       setTags(Array.from(allTags).sort((a, b) => a.localeCompare(b)));
     } catch {
@@ -350,13 +366,13 @@ export default function App() {
     setCreateOpen(true);
   }, []);
 
-  // Create a .vw block view in the current note's folder.
+  // Create an .nhtml HTMX view in the current note's folder.
   const createSurfaceFile = useCallback(async () => {
     const folder = selectedNote && selectedNote.includes('/') ? selectedNote.slice(0, selectedNote.lastIndexOf('/') + 1) : '';
-    let name = 'View.vw';
+    let name = 'View.nhtml';
     let i = 2;
-    while (notes.includes(`${folder}${name}`)) name = `View ${i++}.vw`;
-    await createNote(`${folder}${name}`, VIEW_TEMPLATE);
+    while (notes.includes(`${folder}${name}`)) name = `View ${i++}.nhtml`;
+    await createNote(`${folder}${name}`, HTMX_VIEW_TEMPLATE);
   }, [selectedNote, notes, createNote]);
 
   const toggleShell = useCallback(async () => {
@@ -425,7 +441,9 @@ export default function App() {
     }, 50);
   }, [selectedNote, editorModes]);
 
-  const editorMode: EditorMode = (selectedNote && editorModes[selectedNote]) || 'reading';
+  // Markdown opens in reading view; other text files (JSON config, CSS, manifests) open as raw source.
+  const defaultEditorMode: EditorMode = selectedNote && /\.(md|mdx)$/i.test(selectedNote) ? 'reading' : 'raw';
+  const editorMode: EditorMode = (selectedNote && editorModes[selectedNote]) || defaultEditorMode;
   const setEditorMode = (mode: EditorMode) => {
     if (selectedNote) setEditorModes((prev) => ({ ...prev, [selectedNote]: mode }));
   };
@@ -433,7 +451,11 @@ export default function App() {
   // --- Derived --------------------------------------------------------------
   const filteredNotes = useMemo(
     () => (selectedTag
-      ? notesData.filter((note) => new RegExp(`(?:^|\\s)#${selectedTag}(?=\\s|$|\\.|,)`).test(note.content)).map((note) => note.path)
+      ? notesData.filter((note) => {
+          if (new RegExp(`(?:^|\\s)#${selectedTag}(?=\\s|$|\\.|,)`).test(note.content)) return true;
+          const fm = parseFrontmatter(note.content);
+          return fm.valid && fm.data.tags != null && normalizeStringList(fm.data.tags).includes(selectedTag);
+        }).map((note) => note.path)
       : notes),
     [selectedTag, notesData, notes],
   );
@@ -574,13 +596,13 @@ export default function App() {
         ) : Surface ? (
           surfaceEditing
             ? <Editor ref={editorRef} value={noteContent} onChange={handleContentChange} colorScheme={PRESETS[appearance.preset]?.colorScheme ?? 'dark'} />
-            : <SurfaceBoundary resetKey={`${selectedNote}:${noteContent.length}`}><Surface path={selectedNote} content={noteContent} notesData={notesData} onSelectNote={handleSelectNote} selectedNote={selectedNote} /></SurfaceBoundary>
+            : <SurfaceBoundary resetKey={`${selectedNote}:${noteContent.length}`}><Surface path={selectedNote} content={noteContent} notesData={notesData} onSelectNote={handleSelectNote} selectedNote={selectedNote} colorScheme={PRESETS[appearance.preset]?.colorScheme ?? 'dark'} /></SurfaceBoundary>
         ) : (
           <>
-            {editorMode === 'live' && <LiveEditor value={noteContent} onChange={handleContentChange} colorScheme={PRESETS[appearance.preset]?.colorScheme ?? 'dark'} />}
+            {editorMode === 'live' && <LiveEditor value={noteContent} onChange={handleContentChange} colorScheme={PRESETS[appearance.preset]?.colorScheme ?? 'dark'} tagSuggestions={tags} onTagClick={setSelectedTag} onRequestRawMode={() => setEditorMode('raw')} removeEmptyFrontmatter={propsSettings.removeEmpty} defaultPropertiesCollapsed={propsSettings.collapsedByDefault} />}
             {editorMode === 'raw' && rawSplit}
             {editorMode === 'reading' && (
-              <div className="h-full" onDoubleClick={() => setEditorMode('live')}><MDXPreview mdxContent={noteContent} onLineClick={handleLineClick} /></div>
+              <div className="h-full" onDoubleClick={() => setEditorMode('live')}><MDXPreview mdxContent={noteContent} onLineClick={handleLineClick} tagSuggestions={tags} onTagClick={setSelectedTag} showProperties={propsSettings.showInReading} defaultPropertiesCollapsed={propsSettings.collapsedByDefault} /></div>
             )}
           </>
         )}
@@ -601,11 +623,11 @@ export default function App() {
   } else if (view === 'plugins') {
     mainContent = <PluginsPage onOpenSidePanel={() => setRightPanelOpen(true)} onOpenBottomPanel={() => setBottomPanelOpen(true)} />;
   } else if (view === 'settings') {
-    mainContent = <SettingsPage appearance={appearance} onAppearanceChange={handleAppearanceChange} bindings={bindings} onBindingsChange={updateBindings} />;
+    mainContent = <SettingsPage appearance={appearance} onAppearanceChange={handleAppearanceChange} bindings={bindings} onBindingsChange={updateBindings} properties={propsSettings} onPropertiesChange={updatePropsSettings} />;
   } else if (view === 'gallery') {
     mainContent = <ComponentGallery />;
   } else if (shellConfig && !Surface && !browsing) {
-    // Shell handles plain notes in its editor slot; surface files (.vw) and
+    // Shell handles plain notes in its editor slot; surface files (.nhtml, .db, .canvas) and
     // browser tabs are full-page documents, so let them fall through to notesView.
     mainContent = (
       <div className="flex h-full w-full flex-col">

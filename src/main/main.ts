@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, session } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { importChromeCookies } from './chrome-cookies';
+import { initHtmxViews, getViewServerOrigin, revokeAllViewSessions } from './htmx';
 import * as path from 'path';
 import * as fs from 'fs';
 import chokidar from 'chokidar';
@@ -11,8 +12,9 @@ import * as pty from 'node-pty';
 let mainWindow: BrowserWindow | null = null;
 let watcher: chokidar.FSWatcher | null = null;
 
-// Workspace files: Markdown notes, .vw block-view declarations, and the internal shell config.
-const WORKSPACE_FILE = /(^\.neuron[\/\\]layout\.json$|^neuron\.config$|\.(md|mdx|vw|db|canvas)$)/;
+// Workspace files: Markdown notes, HTMX views (+ their manifests), databases,
+// canvases, the internal shell config, and .neuron configuration/assets.
+const WORKSPACE_FILE = /(^\.neuron[\/\\].+\.(json|html|css)$|^neuron\.config$|\.neuron\.json$|\.(md|mdx|nhtml|db|canvas)$)/;
 
 // ==========================================================================
 // Settings store — JSON file in userData. Holds the active/recent
@@ -116,6 +118,7 @@ function setActiveRepo(dir: string): void {
   settings.repositories.current = dir;
   settings.repositories.recent = [dir, ...settings.repositories.recent.filter((p) => p !== dir)].slice(0, 8);
   writeSettings(settings);
+  revokeAllViewSessions(); // HTMX view tokens are workspace-bound
   setupWatcher();
   if (mainWindow) mainWindow.webContents.send('repository:changed', repoInfo(dir));
 }
@@ -415,114 +418,10 @@ ipcMain.handle('notes:create-section', async (_event, relativePath: string) => {
 ipcMain.handle('notes:get-dir', () => activeRepoPath());
 
 // ==========================================================================
-// IPC - .vw view sources and actions
+// IPC — surface file helpers
 // ==========================================================================
 
-function extensionOf(file: string): string {
-  const ext = path.extname(file).replace(/^\./, '').toLowerCase();
-  return ext || '(none)';
-}
-
-ipcMain.handle('views:source', async (_event, request: { type: string; glob?: string; limit?: number } = { type: 'fileCount' }) => {
-  const repo = activeRepoPath();
-  if (!repo) return { success: false, error: 'No workspace is open.' };
-  try {
-    const files = walkRepoFiles(repo);
-    const matcher = request.glob
-      ? new RegExp(`^${request.glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`, 'i')
-      : null;
-    const visible = matcher ? files.filter((file) => matcher.test(file)) : files;
-    const byExtension = visible.reduce<Record<string, number>>((acc, file) => {
-      const ext = extensionOf(file);
-      acc[ext] = (acc[ext] ?? 0) + 1;
-      return acc;
-    }, {});
-    if (request.type === 'fileTable') {
-      return {
-        success: true,
-        rows: visible.slice(0, request.limit ?? 25).map((file) => {
-          const fullPath = path.join(repo, file);
-          const stat = fs.statSync(fullPath);
-          return { path: file, extension: extensionOf(file), size: stat.size, modified: stat.mtime.toISOString() };
-        }),
-      };
-    }
-    return { success: true, count: visible.length, byExtension };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { success: false, error: message };
-  }
-});
-
-ipcMain.handle('views:action', async (_event, action: { type: string; path?: string; content?: string }) => {
-  const repo = activeRepoPath();
-  if (!repo) return { success: false, error: 'No workspace is open.' };
-  const target = action.path ? path.join(repo, path.normalize(action.path)) : repo;
-  if (!target.startsWith(repo)) return { success: false, error: 'Action path must stay inside the active workspace.' };
-  if (action.type === 'createFile') {
-    if (!action.path) return { success: false, error: 'createFile needs a "path".' };
-    try {
-      fs.mkdirSync(path.dirname(target), { recursive: true });
-      if (!fs.existsSync(target)) fs.writeFileSync(target, action.content ?? '', 'utf-8');
-      return { success: true };
-    } catch (err: unknown) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) };
-    }
-  }
-  if (action.type === 'openInVSCode') {
-    return new Promise((resolve) => {
-      exec(`code .`, { cwd: target }, (error, stdout, stderr) => {
-        resolve({ success: !error, stdout: stdout || '', stderr: stderr || '', code: error?.code ?? 0 });
-      });
-    });
-  }
-  if (action.type === 'reveal') {
-    shell.showItemInFolder(target);
-    return { success: true };
-  }
-  return { success: false, error: `Unknown view action "${action.type}".` };
-});
-
-// RFC4180-ish CSV parser: handles quoted fields, escaped quotes, and CRLF.
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = '';
-  let inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inQuotes) {
-      if (c === '"') {
-        if (text[i + 1] === '"') { field += '"'; i++; } else { inQuotes = false; }
-      } else { field += c; }
-      continue;
-    }
-    if (c === '"') { inQuotes = true; }
-    else if (c === ',') { row.push(field); field = ''; }
-    else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
-    else if (c !== '\r') { field += c; }
-  }
-  if (field.length || row.length) { row.push(field); rows.push(row); }
-  return rows.filter((r) => !(r.length === 1 && r[0] === ''));
-}
-
-// Read a referenced CSV (the "database from a CSV location" feature) into a
-// header + rows table the renderer can display Notion-style.
-ipcMain.handle('views:csv', (_event, relativePath: string) => {
-  const resolved = resolveInRepo(relativePath);
-  if (!resolved) return { success: false, error: 'No workspace is open.' };
-  try {
-    if (!fs.existsSync(resolved.fullPath)) return { success: false, error: `CSV not found: ${relativePath}` };
-    const matrix = parseCsv(fs.readFileSync(resolved.fullPath, 'utf-8'));
-    if (matrix.length === 0) return { success: true, columns: [], rows: [] };
-    const [header, ...body] = matrix;
-    return { success: true, columns: header, rows: body.map((r) => header.map((_, i) => r[i] ?? '')) };
-  } catch (err: unknown) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
-});
-
-// Read a workspace image for <gallery> as a data URL.
+// Read a workspace image for .canvas file nodes as a data URL.
 // ponytail: whole-file base64 over IPC — fine for note-sized images; switch to a custom protocol if galleries get huge.
 const IMAGE_MIME: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', bmp: 'image/bmp', ico: 'image/x-icon' };
 ipcMain.handle('views:file', (_event, relativePath: string) => {
@@ -813,16 +712,29 @@ app.on('web-contents-created', (_event, contents) => {
     webPreferences.sandbox = true;
   });
 
-  // 2. Never let a page spawn a new Electron window; hand http(s) popups to the
-  //    OS browser and deny everything else.
+  // Is this webContents an HTMX view (served from the loopback view server)?
+  const isHtmxView = () => {
+    const origin = getViewServerOrigin();
+    return !!origin && contents.getURL().startsWith(origin);
+  };
+
+  // 2. Never let a page spawn a new Electron window. HTMX views may not open
+  //    anything at all (popups are an exfiltration channel for untrusted
+  //    content); other pages hand http(s) popups to the OS browser.
   contents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//.test(url)) void shell.openExternal(url);
+    if (!isHtmxView() && /^https?:\/\//.test(url)) void shell.openExternal(url);
     return { action: 'deny' };
   });
 
   // 3. The app's own frame may not be navigated away from its bundled content
-  //    (clickjacking / drive-by nav). A <webview> IS a browser, so it may roam.
+  //    (clickjacking / drive-by nav). An HTMX view webview is pinned to its own
+  //    session on the view server. The browser <webview> may roam.
   contents.on('will-navigate', (event, url) => {
+    if (isHtmxView()) {
+      const origin = getViewServerOrigin();
+      if (!origin || !url.startsWith(origin)) event.preventDefault();
+      return;
+    }
     if (contents.getType() === 'webview') return;
     const allowed = url.startsWith('http://localhost:5173') || url.startsWith('file://');
     if (!allowed) {
@@ -851,6 +763,19 @@ app.on('second-instance', () => {
     mainWindow.show();
     mainWindow.focus();
   }
+});
+
+initHtmxViews({
+  getRepoRoot: activeRepoPath,
+  getSetting: (key) => {
+    const settings = readSettings();
+    return key in settings ? settings[key] : null;
+  },
+  setSetting: (key, value) => {
+    const settings = readSettings();
+    settings[key] = value;
+    writeSettings(settings);
+  },
 });
 
 app.on('ready', () => {

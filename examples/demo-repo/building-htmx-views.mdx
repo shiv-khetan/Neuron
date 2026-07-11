@@ -1,0 +1,58 @@
+# Building HTMX views
+
+Neuron can render custom local interfaces from plain HTML files with
+[htmx](https://htmx.org) attributes. Open **Team dashboard.nhtml** in this
+workspace to see one live.
+
+## How it works
+
+- An `.nhtml` file is ordinary HTML. Opening it renders an isolated view tab;
+  the **Source** toggle in the tab header edits the same file as text.
+- htmx attributes (`hx-get`, `hx-post`, `hx-trigger`, `hx-target`, `hx-swap`, …)
+  talk to Neuron's local API at `/api/v1/...`. htmx is bundled with Neuron —
+  views work fully offline and cannot load remote scripts.
+- Create a new view from the command palette (**New HTMX view in current
+  folder**, default shortcut `Ctrl+G`).
+
+## The `.neuron` folder
+
+The first view you open scaffolds `.neuron/` at the workspace root:
+
+- `variables.json` — typed variables readable (and optionally writable) by views.
+  Use them in a view or fragment as `{{ variables.name }}` — values are always
+  HTML-escaped.
+- `fragments/` — reusable HTML partials served at `/api/v1/fragments/<name>`.
+- `styles/` — optional per-view CSS. `My view.nhtml` automatically loads
+  `.neuron/styles/My view.css` if it exists (local rules only; `@import` and
+  remote URLs are blocked).
+- `templates/` — starter views to copy from (dashboard, note browser, file list).
+
+## Permissions
+
+Views are read-only by default. To write files or variables, add a manifest
+next to the view (`Team dashboard.nhtml` → `Team dashboard.neuron.json`)
+declaring `permissions`, `allowedReadPaths`, and `allowedWritePaths`. Neuron
+shows an approval dialog before the first run and again whenever the manifest
+changes. Views can never run scripts, reach the network, or leave the
+workspace.
+
+## Useful endpoints
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/v1/context` | View name, workspace, theme, granted capabilities |
+| `GET /api/v1/search?query=…` | Search notes (returns an HTML fragment for htmx) |
+| `GET /api/v1/notes?tag=…&folder=…` | Note metadata table |
+| `GET /api/v1/tags` | Tag badges |
+| `GET /api/v1/files?dir=…&glob=…` | File listing |
+| `GET/PUT /api/v1/files/content` | Read/update a file (conflict-checked) |
+| `POST/DELETE /api/v1/files` | Create/delete a file (needs permission) |
+| `GET/PUT /api/v1/variables/:key` | Read/update a variable |
+| `GET /api/v1/fragments/:name` | Render a fragment from `.neuron/fragments` |
+
+## Migrating old `.vw` block views
+
+Earlier Neuron versions used `.vw` dashboard files. Those files are no longer
+rendered but remain untouched on disk. Rebuild them as `.nhtml`: layout tags
+become plain HTML with `neuron-*` classes, and data blocks (file lists,
+search, metrics) become `hx-get` calls to the API routes above.
