@@ -56,7 +56,8 @@ export function serializeFrontmatter(
   const doc = parsed.hasFrontmatter && parsed.valid
     ? parseDocument(parsed.raw || '', { schema: 'core' })
     : parseDocument('', { schema: 'core' });
-  if (!isMap(doc.contents)) doc.contents = new YAMLMap();
+  // A freshly-built YAMLMap isn't a "Parsed" node, so assign through a loose view.
+  if (!isMap(doc.contents)) (doc as { contents: unknown }).contents = new YAMLMap();
   const map = doc.contents as YAMLMap;
 
   const wanted = new Set(entries.map((e) => e.key));

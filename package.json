@@ -1,6 +1,6 @@
 {
   "name": "neuron",
-  "version": "1.1.0",
+  "version": "1.4.0",
   "description": "Local-first Markdown and MDX knowledge workspace",
   "author": "Neuron contributors <contributors@neuron.notes>",
   "license": "MIT",
