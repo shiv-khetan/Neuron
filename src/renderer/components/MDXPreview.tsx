@@ -3,6 +3,7 @@ import { AlertCircle } from 'lucide-react';
 import { Badge, Callout, parseSemanticType } from './mdx-components';
 import DocumentProperties from './properties/DocumentProperties';
 import { parseFrontmatter } from '../lib/frontmatter';
+import { sanitizeHtmlToReact } from '../lib/sanitize-html';
 
 interface MDXPreviewProps {
   mdxContent: string;
@@ -311,12 +312,9 @@ export default function MDXPreview({ mdxContent, onLineClick, showProperties = t
         'div', 'span', 'p', 'b', 'i', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li', 'blockquote'
       ];
       if (standardHtmlTags.includes(tagName.toLowerCase())) {
-        return (
-          <div
-            key={`html-${index}`}
-            dangerouslySetInnerHTML={{ __html: jsxStr }}
-          />
-        );
+        // Note content is untrusted — sanitize instead of injecting raw HTML.
+        // (Raw injection here was a stored-XSS path into the privileged renderer.)
+        return <div key={`html-${index}`}>{sanitizeHtmlToReact(jsxStr, `html-${index}`)}</div>;
       }
 
       const err = new Error(`Component "<${tagName} />" is not registered in Neuron.`) as MDXParseError;

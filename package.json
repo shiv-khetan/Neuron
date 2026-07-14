@@ -1,6 +1,6 @@
 {
   "name": "neuron",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Local-first Markdown and MDX knowledge workspace",
   "author": "Neuron contributors <contributors@neuron.notes>",
   "license": "MIT",
@@ -25,7 +25,8 @@
     "test:frontmatter": "node tools/frontmatter.test.mjs",
     "test:htmx": "node tools/htmx-views.test.mjs",
     "test:canvas": "node tools/canvas-model.test.mjs",
-    "test": "npm run test:views && npm run test:frontmatter && npm run test:htmx && npm run test:canvas"
+    "test:sanitize": "node tools/sanitize-html.test.mjs",
+    "test": "npm run test:views && npm run test:frontmatter && npm run test:htmx && npm run test:canvas && npm run test:sanitize"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.2.5",
@@ -97,6 +98,7 @@
     "concurrently": "^8.2.2",
     "electron": "^42.4.1",
     "electron-builder": "^26.15.3",
+    "linkedom": "^0.18.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
     "tailwindcss-animate": "^1.0.7",
