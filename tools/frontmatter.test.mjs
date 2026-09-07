@@ -12,7 +12,7 @@ const tmp = join(root, 'tools/.frontmatter.tmp.cjs');
 // Bundle so the `yaml` dependency + local imports resolve in one file. CJS
 // output because `yaml` ships CommonJS and uses require() internally.
 await build({ entryPoints: [entry], bundle: true, format: 'cjs', platform: 'node', outfile: tmp, logLevel: 'silent' });
-const { parseFrontmatter, serializeFrontmatter } = await import(pathToFileURL(tmp));
+const { parseFrontmatter, serializeFrontmatter, isFullWidth } = await import(pathToFileURL(tmp));
 rmSync(tmp);
 
 let passed = 0;
@@ -168,6 +168,37 @@ ok(serializeFrontmatter('﻿---\ntitle: X\n---\nb\n', [{ key: 'title', value: 'Y
   const big = '---\n' + 'x: ' + 'a'.repeat(70 * 1024) + '\n---\nbody\n';
   const r = parseFrontmatter(big);
   ok(r.hasFrontmatter && !r.valid, 'oversized frontmatter → invalid/raw fallback');
+}
+
+// --- full-width pages -------------------------------------------------------
+//
+// Reading view and the live editor both key off this one predicate, so if it
+// disagrees with itself the two views render the same note at different widths.
+{
+  const widthOf = (yaml) => isFullWidth(parseFrontmatter(`---\n${yaml}\n---\nbody\n`).data);
+
+  ok(widthOf('fullWidth: true'), 'fullWidth: true opts in');
+  ok(!widthOf('fullWidth: false'), 'fullWidth: false stays capped');
+  ok(!widthOf('title: Note'), 'a note that never mentions it stays capped');
+  ok(!isFullWidth(parseFrontmatter('# No frontmatter at all\n').data), 'no frontmatter, no opt-in');
+
+  // Hand-typed YAML. Quoting a boolean is the easiest mistake to make here and
+  // the hardest to spot, because nothing about the page says why it did not
+  // widen.
+  ok(widthOf('fullWidth: "true"'), 'the quoted spelling counts');
+  ok(widthOf('fullWidth: TRUE'), 'case does not matter');
+
+  // Not a truthiness check: every non-empty string would pass one, so
+  // `fullWidth: someday` would silently widen the page.
+  ok(!widthOf('fullWidth: someday'), 'an unrelated string does not opt in');
+  ok(!widthOf('fullWidth: 1'), 'a number does not opt in');
+
+  // The properties panel writes a real boolean, and reads it back as a
+  // checkbox rather than a text field -- that is what makes it a toggle.
+  const property = parseFrontmatter('---\nfullWidth: true\n---\nbody\n')
+    .properties.find((p) => p.key === 'fullWidth');
+  eq(property.type, 'boolean', 'fullWidth is typed as a boolean property');
+  eq(property.label, 'Full Width', 'and gets a readable label in the panel');
 }
 
 console.log(`✓ frontmatter: ${passed} assertions passed`);

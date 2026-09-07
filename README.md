@@ -38,9 +38,13 @@ Neuron treats your notes as durable files, not records trapped in a hosted datab
 
 ## Download
 
+**Windows** — [get it from the Microsoft Store](https://apps.microsoft.com/detail/9pfc0xc16c1g).
+Signed by Microsoft after certification, so there is no SmartScreen prompt, and
+the Store keeps it updated.
+
 ```bash
 brew install --cask neuron-workspace/neuron/neuron   # macOS
-choco install neuron                                 # Windows
+choco install neuron                                 # Windows, if you prefer a package manager
 ```
 
 Installers are also published on the repository's **Releases** page, and the
@@ -54,7 +58,14 @@ companion GitHub Pages site always links to the newest one.
 
 Linux has no package-manager entry yet; use the AppImage or the `.deb`.
 
-> Release builds are currently unsigned. Windows SmartScreen and macOS Gatekeeper may display a warning until signing certificates and notarization are configured. Do not disable operating-system protections globally.
+> **On the warnings.** The Microsoft Store build is signed by Microsoft after
+> certification and prompts for nothing. Direct downloads are a different story:
+> Windows builds carry no paid code-signing certificate, so SmartScreen blocks
+> the installer on a reputation check, and macOS builds are signed ad-hoc rather
+> than with a Developer ID, so Gatekeeper asks you to confirm the first launch.
+> Both are expected and both clear permanently —
+> [here is exactly what you will see](https://neuron-workspace.github.io/installing.html).
+> Do not disable operating-system protections globally.
 
 ## Quick start from source
 

@@ -350,6 +350,13 @@ body.platform-darwin.window-fullscreen .titlebar {
 }
 
 .preview-prose { max-width: 720px; }
+
+/* `fullWidth: true` in a note's frontmatter. The measure is capped for prose,
+   which is wrong for the documents people open a wide window for -- a nine
+   column table, a diagram, a dashboard of layout components. The flag sits on
+   the scroll container, so the properties panel and the article widen together.
+   Only the cap is lifted: the page keeps its padding and its rhythm. */
+[data-full-width] .preview-prose { max-width: none; }
 .preview-prose h1,
 .preview-prose h2,
 .preview-prose h3 { text-wrap: balance; letter-spacing: -0.02em; }
@@ -384,6 +391,9 @@ body.platform-darwin.window-fullscreen .titlebar {
 
 /* Live editor */
 .cm-live-editor .cm-content { padding: 2rem 1.5rem; max-width: 768px; margin: 0 auto; font-family: "Geist", ui-sans-serif, system-ui, sans-serif; font-size: 16px; color: var(--md-text); }
+/* Same note, same flag, so switching between reading and live does not change
+   the width the document is written at. */
+.cm-live-editor[data-full-width] .cm-content { max-width: none; }
 .cm-live-editor .cm-line { line-height: 1.7; }
 .cm-live-editor .cm-lp-prose { color: var(--md-text); }
 .cm-live-editor .cm-lp-prose > span { color: inherit !important; }

@@ -13,7 +13,7 @@ import { Badge, Callout, parseSemanticType, MarkdownTable, parseMarkdownTable } 
 import { Run } from './RunButton';
 import { buildWikiIndex, resolveWikiLink, type WikiIndex } from '../lib/wikilinks';
 import DocumentProperties from './properties/DocumentProperties';
-import { parseFrontmatter } from '../lib/frontmatter';
+import { isFullWidth, parseFrontmatter } from '../lib/frontmatter';
 
 interface LiveEditorProps {
   value: string;
@@ -517,6 +517,10 @@ export default function LiveEditor({ value, onChange, colorScheme = 'dark', tagS
   // Keep the frontmatter widget's config current without re-creating editor
   // extensions (which would reset editor state).
   fmConfig = { tagSuggestions, onTagClick, onRequestRawMode, removeEmpty: removeEmptyFrontmatter, defaultCollapsed: defaultPropertiesCollapsed };
+  // Only the leading frontmatter block is read, and parse is bounded by
+  // LIMITS.maxBytes, so this stays cheap on a document being typed into.
+  const fullWidth = useMemo(() => isFullWidth(parseFrontmatter(value).data), [value]);
+
   const wikiNotes = useMemo(() => buildWikiIndex(notes), [notes]);
   wikiConfig = { index: wikiNotes, onOpen: onWikiLinkClick };
 
@@ -567,7 +571,7 @@ export default function LiveEditor({ value, onChange, colorScheme = 'dark', tagS
   }, []);
 
   return (
-    <div className="cm-live-editor h-full w-full overflow-hidden">
+    <div className="cm-live-editor h-full w-full overflow-hidden" data-full-width={fullWidth || undefined}>
       <CodeMirror
         ref={editorRef}
         aria-label="Live editor"

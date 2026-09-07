@@ -6,7 +6,7 @@ import { Run } from './RunButton';
 import DbView from './DbView';
 import { Row, Col, Grid, Cell, Card, Stat, Divider } from './mdx-layout';
 import DocumentProperties from './properties/DocumentProperties';
-import { parseFrontmatter } from '../lib/frontmatter';
+import { isFullWidth, parseFrontmatter } from '../lib/frontmatter';
 import { sanitizeHtmlToReact } from '../lib/sanitize-html';
 import MermaidDiagram from './MermaidDiagram';
 
@@ -689,7 +689,13 @@ export default function MDXPreview({ mdxContent, colorScheme = 'dark', onLineCli
   }
 
   return (
-    <div className="canvas-surface h-full w-full overflow-y-auto p-7 font-sans select-text">
+    // The flag goes on the scroll container rather than on each block inside
+    // it, so the properties panel and the article widen together and a future
+    // block cannot forget to opt in.
+    <div
+      className="canvas-surface h-full w-full overflow-y-auto p-7 font-sans select-text"
+      data-full-width={isFullWidth(fm.data) || undefined}
+    >
       {showProperties && fm.hasFrontmatter && (
         <div className="preview-prose mx-auto mb-4">
           <DocumentProperties doc={mdxContent} tagSuggestions={tagSuggestions} onTagClick={onTagClick} defaultCollapsed={defaultPropertiesCollapsed} hideWhenEmpty />
