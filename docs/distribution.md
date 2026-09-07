@@ -108,6 +108,20 @@ notarization credentials. Not currently configured.
 
 ## Microsoft Store
 
+**Published and live**, as of 8 September 2026:
+<https://apps.microsoft.com/detail/9pfc0xc16c1g> — listed as *Neuron Desktop*.
+
+This is now the best way to install on Windows, and the only channel where the
+first launch is not an argument with the operating system. The Store package is
+signed by Microsoft after certification, so SmartScreen has nothing to warn
+about; updates come from the Store rather than the in-app updater, which
+`updater.ts` already knows to stand down for (`windowsStore` → no update check,
+so the two never fight over the same install).
+
+The store identity stays on the personal account rather than the organisation —
+see the table below. Moving the repository did not move the listing, and it
+should not: the certificate and the Partner Center account are tied to it.
+
 The Partner Center identity is filled in, and verified against a real build:
 
 | Partner Center field | `build.appx` key | Value |
@@ -229,6 +243,7 @@ Checked 5 September 2026, against 0.4.5.
 
 | | Status | What a user runs |
 |---|---|---|
+| Microsoft Store | **Live.** Certified and signed by Microsoft, so no SmartScreen prompt; updates come from the Store. | [apps.microsoft.com/detail/9pfc0xc16c1g](https://apps.microsoft.com/detail/9pfc0xc16c1g) |
 | Homebrew | **Live.** `Casks/neuron.rb` is on the tap at 0.4.5. | `brew install --cask neuron-workspace/neuron/neuron` |
 | Chocolatey | **Submitted, awaiting a human moderator.** All three automated checks (validation, verification, virus scan) pass. | `choco install neuron` — see the caveat below |
 | WinGet | **Not submitted.** `NeuronWorkspace.Neuron` does not exist in `microsoft/winget-pkgs` yet, and the action cannot create it. | nothing yet |

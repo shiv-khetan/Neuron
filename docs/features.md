@@ -132,6 +132,32 @@ collapsed, or remove the frontmatter block when its final property is deleted.
 Invalid YAML is never silently rewritten: Neuron shows a diagnostic and offers
 **Edit as YAML**.
 
+## Give one note the full width of the window
+
+Reading view and the Live editor cap their measure so prose stays readable.
+That is the wrong shape for a table with nine columns, a wide diagram, or a
+dashboard built from layout components. Add `fullWidth` to the note's
+frontmatter and that one note uses the whole pane instead:
+
+```yaml
+---
+title: Quarterly review
+fullWidth: true
+---
+```
+
+It applies to Reading view, the Live editor, and the preview half of Split, so
+switching views never changes the width the document is written at. Every other
+note is unaffected — this is a property of the file, not an app setting, so it
+travels with the note into any other editor.
+
+Once the property exists, the properties panel shows it as a **Full Width**
+checkbox, which is the easiest way to turn it back off. Adding it from the panel
+works too: create a property called `fullWidth` and give it the value `true`.
+The panel stores that as text rather than a YAML boolean, and Neuron accepts
+either — a page that refused to widen because of a pair of quotes would be
+worse than no setting at all.
+
 ## Connect notes with wiki-links and tags
 
 Write `[[Note name]]` in a `.md` or `.mdx` note. Wiki-links are styled in the

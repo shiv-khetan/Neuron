@@ -22,6 +22,27 @@ export function labelFor(key: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
+/**
+ * Whether a document asks to be laid out edge to edge.
+ *
+ * Reading view and the live editor both cap their measure for the sake of
+ * prose, which is right for prose and wrong for the documents people reach for
+ * a wide window to write: a table with nine columns, a Mermaid diagram, a
+ * dashboard of layout components. `fullWidth: true` in the frontmatter lifts
+ * the cap for that one note, and travels with the file like every other
+ * property rather than living in app settings.
+ *
+ * Written by the properties panel as a real boolean, but hand-typed at least as
+ * often, so the quoted spelling YAML produces for `fullWidth: "true"` counts
+ * too. A setting that silently does nothing because of a pair of quotes is
+ * worse than no setting.
+ */
+export function isFullWidth(data: Record<string, unknown>): boolean {
+  const value = data.fullWidth;
+  if (typeof value === 'boolean') return value;
+  return typeof value === 'string' && value.trim().toLowerCase() === 'true';
+}
+
 // Normalize a tags/aliases value: YAML permits either a scalar ("a b") or a
 // list. We store a string[] internally and never force a `#` prefix.
 export function normalizeStringList(value: unknown): string[] {
