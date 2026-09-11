@@ -158,6 +158,25 @@ The panel stores that as text rather than a YAML boolean, and Neuron accepts
 either — a page that refused to widen because of a pair of quotes would be
 worse than no setting at all.
 
+## Quiz yourself with flashcards
+
+`<Flashcard>` is a question you answer before you are shown the answer. The
+prompt is the `front` attribute; everything inside is the answer:
+
+```mdx
+<Flashcard front="Where do Neuron notes live?">
+As plain files in a folder you already own.
+</Flashcard>
+```
+
+The answer is not in the document until you press **Show answer**, so it cannot
+be read by scrolling past or by searching the page. Cards behave the same way in
+Reading view and in the Live editor, and each card reveals on its own.
+
+The prompt is plain text — attributes are never parsed as Markdown — while the
+answer goes through the usual parser, so it can hold a list, `code`, or
+emphasis.
+
 ## Connect notes with wiki-links and tags
 
 Write `[[Note name]]` in a `.md` or `.mdx` note. Wiki-links are styled in the
