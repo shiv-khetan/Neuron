@@ -1,7 +1,26 @@
-import { test, expect } from './fixtures';
+import { test, expect, openNote } from './fixtures';
+import type { Locator } from '@playwright/test';
 
 // T-026. The graph is a floating square over the editor, on by default, drawing
 // the whole workspace -- not a full-height column showing the active note alone.
+
+/**
+ * Wait until Sigma has actually painted a frame.
+ *
+ * Sigma hit-tests a pointer against what it has DRAWN, not against the graph
+ * model. `data-layout-running="false"` says the physics finished; it says
+ * nothing about the renderer having caught up. On a machine with a GPU the two
+ * are close enough that the difference never shows, but CI has no GPU and runs
+ * on SwiftShader, where the paint lands later -- so a mouse press computed from
+ * `graphToViewport` arrived before the renderer knew where anything was, and
+ * `downNode` never fired. The node was exactly where the test thought; Sigma
+ * had simply not drawn it yet.
+ */
+const painted = (canvas: Locator) => canvas.evaluate((el: any) => new Promise<void>((resolve) => {
+  if (!el.sigma) { resolve(); return; }
+  el.sigma.once('afterRender', () => resolve());
+  el.sigma.refresh();
+}));
 
 test('the graph is visible without touching a shortcut', async ({ page }) => {
   // No keypress, no focus juggling. It is on by default because it replaced a
@@ -25,20 +44,12 @@ test('the graph is visible without touching a shortcut', async ({ page }) => {
   await expect(graph.getByRole('button', { name: 'Hide graph' })).toBeVisible();
 });
 
-test('the graph draws every note, not only the active one', async ({ page }) => {
-  const graph = page.getByRole('complementary', { name: 'Workspace graph' });
-  await expect(graph).toBeVisible();
-
-  const nodes = graph.locator('.graph-node');
-  await expect(nodes.first()).toBeVisible();
-  // The demo workspace has well over a dozen notes. The old panel scoped to the
-  // active note and drew one.
-  expect(await nodes.count()).toBeGreaterThan(5);
-
-  const faded = await nodes.evaluateAll(
-    (els) => els.filter((el) => Number((el as HTMLElement).style.opacity || '1') < 0.85).length,
-  );
-  expect(faded).toBe(0);
+test('the graph draws every note using Sigma WebGL', async ({ page }) => {
+  const canvas = page.locator('[data-graph-canvas]').first();
+  await expect(canvas.locator('canvas.sigma-nodes')).toBeVisible();
+  await expect.poll(() => canvas.evaluate((el: any) => el.sigma?.getGraph().order ?? 0)).toBeGreaterThan(5);
+  await expect.poll(() => canvas.evaluate((el: any) => el.sigma?.getGraph().order ?? 0)).toBeGreaterThan(5);
+  expect(await canvas.evaluate((el: any) => el.sigma.getGraph().nodes().every((id: string) => !el.sigma.getNodeDisplayData(id).hidden))).toBe(true);
 });
 
 test('the graph sits over the editor and can be dismissed', async ({ page }) => {
@@ -62,56 +73,28 @@ test('no full-height graph column remains in the shell layout', async ({ page, w
 });
 
 test('the graph recentres on the open note, zooms, and pans', async ({ page }) => {
-  const graph = page.getByRole('complementary', { name: 'Workspace graph' });
-  // The panel holds two svgs -- the graph and the close icon.
-  const svg = graph.locator('svg[data-graph-canvas]');
-  const box = async () => (await svg.getAttribute('viewBox'))!.split(' ').map(Number);
-
-  const open = async (name: string) => {
-    await page.getByRole('button', { name: /Search & commands/ }).click();
-    const dialog = page.locator('[role="dialog"]');
-    await expect(dialog).toBeVisible();
-    await dialog.locator('input').first().fill(name);
-    await dialog.getByText(name, { exact: false }).first().click();
-    await expect(dialog).toBeHidden();
-  };
-
-  // The open note sits at the centre of the panel. Under the BFS layout it is
-  // always placed at the spiral origin and the camera centres there, so
-  // comparing viewBox origins between two notes proves nothing -- they are
-  // identical by construction. What matters is that the note you opened is the
-  // one in the middle.
-  await open('guides/markdown-basics');
-  const svgBox = (await svg.boundingBox())!;
-  // Nodes are labelled by path, not basename, so two notes with the same name
-  // in different folders stay distinguishable.
-  const active = graph.locator('.graph-node[aria-label="Open guides/markdown-basics"]');
-  await expect(active).toBeVisible();
-  const nodeBox = (await active.boundingBox())!;
-  const offCentre = Math.hypot(
-    (nodeBox.x + nodeBox.width / 2) - (svgBox.x + svgBox.width / 2),
-    (nodeBox.y + nodeBox.height / 2) - (svgBox.y + svgBox.height / 2),
-  );
-  expect(offCentre).toBeLessThan(24);
-
-  // Wheel zooms in: a narrower viewport shows less of the graph, larger.
-  const [, , beforeW] = await box();
-  const rect = (await svg.boundingBox())!;
+  const canvas = page.locator('[data-graph-canvas]').first();
+  await expect(canvas.locator('canvas.sigma-nodes')).toBeVisible();
+  await expect.poll(() => canvas.evaluate((el: any) => el.sigma?.getGraph().order ?? 0)).toBeGreaterThan(5);
+  await expect(page.locator('[data-graph-root]').first()).toHaveAttribute('data-layout-running', 'false');
+  await openNote(page, 'guides/markdown-basics');
+  await expect.poll(() => canvas.evaluate((el: any) => {
+    const s = el.sigma, g = s.getGraph();
+    const id = g.nodes().find((id: string) => id.includes('guides/markdown-basics'));
+    const p = s.graphToViewport(g.getNodeAttributes(id));
+    return Math.hypot(p.x - el.clientWidth / 2, p.y - el.clientHeight / 2);
+  })).toBeLessThan(24);
+  const before = await canvas.evaluate((el: any) => el.sigma.getCamera().ratio);
+  const rect = (await canvas.boundingBox())!;
   await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
   await page.mouse.wheel(0, -240);
-  await expect.poll(async () => (await box())[2], { timeout: 10_000 }).toBeLessThan(beforeW);
-
-  // Dragging the background pans, and does not snap back to the selected node.
-  const [zx, zy] = await box();
-  // Grab empty space, not the centre: after zooming to a note the centre IS
-  // that node, and beginPan deliberately ignores a press on one so a click
-  // still opens it.
+  await expect.poll(() => canvas.evaluate((el: any) => el.sigma.getCamera().ratio)).toBeLessThan(before);
+  const camera = await canvas.evaluate((el: any) => el.sigma.getCamera().getState());
   await page.mouse.move(rect.x + 12, rect.y + rect.height - 12);
   await page.mouse.down();
   await page.mouse.move(rect.x + 72, rect.y + rect.height - 52, { steps: 8 });
   await page.mouse.up();
-  const [px, py] = await box();
-  expect(Math.abs(px - zx) + Math.abs(py - zy)).toBeGreaterThan(1);
+  await expect.poll(() => canvas.evaluate((el: any) => el.sigma.getCamera().x)).not.toBe(camera.x);
 });
 
 test('the graph can be closed and reopened from the title bar', async ({ page }) => {
@@ -150,68 +133,119 @@ test('the graph panel can be dragged to a new position', async ({ page }) => {
   expect(after.y).toBeGreaterThan(0);
 });
 
-test('nodes glide to their new places instead of jumping', async ({ page }) => {
+test('opening notes preserves layout coordinates; reopening restores positions', async ({ page }) => {
   const graph = page.getByRole('complementary', { name: 'Workspace graph' });
-  const centreOf = async (label: string) => {
-    const box = await graph.locator(`.graph-node[aria-label="Open ${label}"]`).boundingBox();
-    return box ? { x: box.x + box.width / 2, y: box.y + box.height / 2 } : null;
-  };
+  const canvas = graph.locator('[data-graph-canvas]');
+  await expect(canvas.locator('canvas.sigma-nodes')).toBeVisible();
+  await expect.poll(() => canvas.evaluate((el: any) => el.sigma?.getGraph().order ?? 0)).toBeGreaterThan(5);
+  await expect(graph.locator('[data-graph-root]')).toHaveAttribute('data-layout-running', 'false');
+  const snapshot = () => canvas.evaluate((el: any) => Object.fromEntries(el.sigma.getGraph().mapNodes((id: string, a: any) => [id, { x: a.x, y: a.y }])));
+  const before = await snapshot();
+  await openNote(page, 'guides/markdown-basics');
+  expect(await snapshot()).toEqual(before);
+  await graph.getByRole('button', { name: 'Hide graph' }).click();
+  await page.getByRole('button', { name: 'Show graph' }).click();
+  await expect(canvas.locator('canvas.sigma-nodes')).toBeVisible();
+  await expect.poll(() => canvas.evaluate((el: any) => el.sigma?.getGraph().order ?? 0)).toBeGreaterThan(5);
+  await expect.poll(snapshot).toEqual(before);
+});
 
-  // Select by clicking a node, not through the palette. Waiting for the palette
-  // dialog to tear down takes longer than the 320ms tween, so the first sample
-  // arrived after the animation had already finished -- the test missed it, the
-  // feature was fine.
-  const target = graph.locator('.graph-node').nth(3);
-  const label = await target.getAttribute('aria-label');
-  const name = label!.replace(/^Open /, '');
+test('local depth and display settings persist without moving shared nodes', async ({ page }) => {
+  const graph = page.getByRole('complementary', { name: 'Workspace graph' });
+  const canvas = graph.locator('[data-graph-canvas]');
+  await expect(canvas.locator('canvas.sigma-nodes')).toBeVisible();
+  await expect.poll(() => canvas.evaluate((el: any) => el.sigma?.getGraph().order ?? 0)).toBeGreaterThan(5);
+  await expect(graph.locator('[data-graph-root]')).toHaveAttribute('data-layout-running', 'false');
+  await openNote(page, 'guides/markdown-basics');
+  const before = await canvas.evaluate((el: any) => el.sigma.getGraph().export());
+  await graph.getByRole('button', { name: 'Connection settings' }).click();
+  const settings = page.getByRole('dialog', { name: 'Connection settings' });
+  await settings.getByRole('button', { name: 'Local', exact: true }).click();
+  await settings.getByRole('slider', { name: 'Local depth' }).fill('2');
+  await settings.getByLabel('Show arrows').check();
+  await settings.getByRole('button', { name: 'Close connection settings' }).click();
+  expect(await canvas.evaluate((el: any) => el.sigma.getGraph().export())).toEqual(before);
+  await graph.getByRole('button', { name: 'Hide graph' }).click();
+  await page.getByRole('button', { name: 'Show graph' }).click();
+  await expect(canvas.locator('canvas.sigma-nodes')).toBeVisible();
+  await expect.poll(() => canvas.evaluate((el: any) => el.sigma?.getGraph().order ?? 0)).toBeGreaterThan(5);
+  await graph.getByRole('button', { name: 'Connection settings' }).click();
+  await expect(settings.getByRole('button', { name: 'Local', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(settings.getByRole('slider', { name: 'Local depth' })).toHaveValue('2');
+  await expect(settings.getByLabel('Show arrows')).toBeChecked();
+});
 
-  const before = await centreOf(name);
-  expect(before).not.toBeNull();
+test('nodes can be dragged and the layout stops after reheating', async ({ page }) => {
+  const canvas = page.locator('[data-graph-canvas]').first();
+  await expect.poll(() => canvas.evaluate((el: any) => el.sigma?.getGraph().order ?? 0)).toBeGreaterThan(5);
+  await expect(page.locator('[data-graph-root]').first()).toHaveAttribute('data-layout-running', 'false');
+  await painted(canvas);
+  const rect = (await canvas.boundingBox())!;
+  const target = await canvas.evaluate((el: any) => {
+    const s = el.sigma, g = s.getGraph();
+    return g.nodes().map((id: string) => ({ id, ...s.graphToViewport(g.getNodeAttributes(id)), point: { x: g.getNodeAttribute(id, 'x'), y: g.getNodeAttribute(id, 'y') } }))
+      .find((n: any) => n.x > 30 && n.x < el.clientWidth - 50 && n.y > 50 && n.y < el.clientHeight - 40);
+  });
+  expect(target).toBeTruthy();
+  await page.mouse.move(rect.x + target.x, rect.y + target.y);
+  await page.mouse.down();
+  await page.mouse.move(rect.x + target.x + 30, rect.y + target.y + 20, { steps: 10 });
+  const during = await canvas.evaluate((el: any) => {
+    const g = el.sigma.getGraph();
+    const id = g.nodes().find((id: string) => g.getNodeAttribute(id, 'fixed'));
+    return id ? { x: g.getNodeAttribute(id, 'x'), y: g.getNodeAttribute(id, 'y') } : null;
+  });
+  expect(during).not.toEqual(target.point);
+  expect(during).not.toBeNull();
+  await page.mouse.up();
+  await expect(page.locator('[data-graph-root]').first()).toHaveAttribute('data-layout-running', 'false');
+  const before = await canvas.evaluate((el: any) => el.sigma.getGraph().export());
+  await page.waitForTimeout(200);
+  expect(await canvas.evaluate((el: any) => el.sigma.getGraph().export())).toEqual(before);
+});
 
-  // Sample from inside the page, on requestAnimationFrame.
-  //
-  // The previous version took one boundingBox 80ms after the click and required
-  // the 320ms tween to still be running. That races the machine: on a loaded
-  // runner the 80ms wait plus a driver round-trip lands after the animation has
-  // finished, and the test fails on a feature that worked. It had already been
-  // rewritten once for this and it failed again during a run that took two and
-  // a half times as long as usual.
-  //
-  // Sampling in-page removes the race entirely, because the sampler and the
-  // animation now share one clock. If the renderer is starved the tween is
-  // starved with it, and the samples still land mid-flight.
-  // Click a circle, not the group. The group's box spans the label above the
-  // circle, so its centre lands in the gap between the two -- and the label is
-  // pointer-events-none, so the click reaches the SVG behind it and pans the
-  // canvas instead of selecting. Windows and macOS happened to place the centre
-  // on the circle; Linux, with different font metrics, did not.
-  await target.locator('circle').first().click();
-  const points: [number, number][] = await page.evaluate(async (selector) => {
-    const el = document.querySelector(selector);
-    if (!el) return [];
-    const seen: [number, number][] = [];
-    const began = performance.now();
-    await new Promise<void>((resolve) => {
-      const tick = () => {
-        const r = el.getBoundingClientRect();
-        seen.push([r.x + r.width / 2, r.y + r.height / 2]);
-        if (performance.now() - began > 600) resolve();
-        else requestAnimationFrame(tick);
+test('file changes update relationships and resolve missing targets', async ({ page, workspace }) => {
+  const { writeFileSync, unlinkSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const canvas = page.locator('[data-graph-canvas]').first();
+  await expect.poll(() => canvas.evaluate((el: any) => el.sigma?.getGraph().order ?? 0)).toBeGreaterThan(5);
+  writeFileSync(join(workspace, 'graph-source.md'), '[[graph-target]]');
+  await expect.poll(() => canvas.evaluate((el: any) => el.sigma.getGraph().hasNode('unresolved:graph-target'))).toBe(true);
+  writeFileSync(join(workspace, 'graph-target.md'), '# Target');
+  await expect.poll(() => canvas.evaluate((el: any) => el.sigma.getGraph().hasDirectedEdge('graph-source.md', 'graph-target.md'))).toBe(true);
+  await expect.poll(() => canvas.evaluate((el: any) => el.sigma.getGraph().hasNode('unresolved:graph-target'))).toBe(false);
+  unlinkSync(join(workspace, 'graph-target.md'));
+  await expect.poll(() => canvas.evaluate((el: any) => el.sigma.getGraph().hasNode('unresolved:graph-target'))).toBe(true);
+});
+
+test('clicking a node animates the camera through intermediate positions', async ({ page }) => {
+  const canvas = page.locator('[data-graph-canvas]').first();
+  await expect.poll(() => canvas.evaluate((el: any) => el.sigma?.getGraph().order ?? 0)).toBeGreaterThan(5);
+  await expect(page.locator('[data-graph-root]').first()).toHaveAttribute('data-layout-running', 'false');
+  await painted(canvas);
+  const rect = (await canvas.boundingBox())!;
+  const target = await canvas.evaluate((el: any) => {
+    const s = el.sigma, g = s.getGraph();
+    return g.nodes().filter((id: string) => g.getNodeAttribute(id, 'kind') === 'note')
+      .map((id: string) => ({ id, ...s.graphToViewport(g.getNodeAttributes(id)) }))
+      .find((n: any) => n.x > 25 && n.x < el.clientWidth - 25 && n.y > 50 && n.y < el.clientHeight - 25 && Math.hypot(n.x - el.clientWidth/2, n.y - el.clientHeight/2) > 30);
+  });
+  expect(target).toBeTruthy();
+  // Sample on the same clock as the animation, starting at the real DOM click.
+  await canvas.evaluate((el: any) => {
+    el.cameraSamples = [];
+    el.addEventListener('click', () => {
+      const began = performance.now();
+      const sample = () => {
+        const c = el.sigma.getCamera(); el.cameraSamples.push([c.x, c.y]);
+        if (performance.now() - began < 650) requestAnimationFrame(sample);
+        else el.samplesComplete = true;
       };
-      requestAnimationFrame(tick);
-    });
-    return seen;
-  }, `.graph-node[aria-label="Open ${name}"]`);
-
-  expect(points.length).toBeGreaterThan(3);
-
-  const arrived = points[points.length - 1];
-  const travelled = Math.hypot(arrived[0] - before!.x, arrived[1] - before!.y);
-  expect(travelled).toBeGreaterThan(20);
-
-  // A tween passes through intermediate positions; a jump reports the
-  // destination from the very first frame. Rounding to the half pixel keeps
-  // sub-pixel jitter from counting as movement.
-  const distinct = new Set(points.map(([x, y]) => `${Math.round(x * 2)},${Math.round(y * 2)}`));
-  expect(distinct.size, 'the node teleported instead of gliding').toBeGreaterThan(2);
+      sample();
+    }, { once: true, capture: true });
+  });
+  await page.mouse.click(rect.x + target.x, rect.y + target.y);
+  await expect.poll(() => canvas.evaluate((el: any) => !!el.samplesComplete)).toBe(true);
+  const samples = await canvas.evaluate((el: any) => el.cameraSamples);
+  expect(new Set(samples.map(([x,y]: number[]) => `${x.toFixed(4)},${y.toFixed(4)}`)).size).toBeGreaterThan(2);
 });

@@ -8,7 +8,7 @@ import MDXPreview from '../components/MDXPreview';
 import XtermTerminal from '../components/XtermTerminal';
 import WorkspaceExplorer from '../views/WorkspaceExplorer';
 import { useExplorer, type ExplorerState } from '../lib/explorer-state';
-import type { NoteData, SurfaceProps } from './index';
+import type { SurfaceProps } from './index';
 import type { PanelSpec } from './layout';
 
 /**
@@ -50,31 +50,6 @@ function folderOf(path: string): string {
   return i >= 0 ? path.slice(0, i + 1) : '';
 }
 
-function scopeNotes(surface: SurfaceProps, spec: PanelSpec): NoteData[] {
-  const scope = typeof spec.scope === 'string' ? spec.scope : 'repo';
-  if (scope === 'active' && surface.selectedNote) {
-    const active = surface.notesData.find((note) => note.path === surface.selectedNote);
-    if (!active) return [];
-    const links = new Set<string>();
-    const re = /\[\[(.*?)\]\]/g;
-    let match;
-    while ((match = re.exec(active.content)) !== null) {
-      const target = match[1].trim().toLowerCase();
-      for (const note of surface.notesData) {
-        const label = note.path.replace(/\.(md|mdx)$/, '').toLowerCase();
-        const base = label.split('/').pop();
-        if (label === target || base === target) links.add(note.path);
-      }
-    }
-    return surface.notesData.filter((note) => note.path === active.path || links.has(note.path));
-  }
-  if (scope === 'folder') {
-    const root = typeof spec.root === 'string' ? spec.root : folderOf(surface.selectedNote ?? surface.path);
-    return surface.notesData.filter((note) => note.path.startsWith(root));
-  }
-  return surface.notesData;
-}
-
 function GraphPanel({ spec, surface }: PanelContext) {
   // Default to the whole workspace. scope:'active' filtered to the current note
   // and its links, which in practice drew one node in a full-height column --
@@ -83,7 +58,9 @@ function GraphPanel({ spec, surface }: PanelContext) {
   return (
     <div className="h-full">
       <GraphCanvas
-        notesData={spec.scope ? scopeNotes(surface, spec) : surface.notesData}
+        notesData={surface.notesData}
+        scope={spec.scope === 'active' || spec.scope === 'folder' ? spec.scope : 'repo'}
+        folder={typeof spec.root === 'string' ? spec.root : folderOf(surface.selectedNote ?? surface.path)}
         onSelectNote={surface.onSelectNote}
         selectedNote={surface.selectedNote}
         emptyHint="Links between notes appear here."

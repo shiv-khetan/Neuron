@@ -274,8 +274,20 @@ export default function App() {
           .map(async (path) => ({ path, content: await window.electronAPI.readNote(path) })),
       );
       setNotesData(data);
+
+    } catch {
+      setNotice('Could not load the workspace.');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!repository) { setNotes([]); setNotesData([]); setTags([]); setSelectedNote(null); return; }
+    loadNotes();
+  }, [repository, loadNotes]);
+
+  useEffect(() => {
       const allTags = new Set<string>();
-      data.forEach((note) => {
+      notesData.forEach((note) => {
         // Body #tags…
         const tagRegex = /(?:^|\s)#([A-Za-z0-9_-]+)(?=\s|$|\.|,)/g;
         let match;
@@ -288,15 +300,7 @@ export default function App() {
         if (fm.valid && fm.data.tags != null) normalizeStringList(fm.data.tags).forEach((t) => allTags.add(t));
       });
       setTags(Array.from(allTags).sort((a, b) => a.localeCompare(b)));
-    } catch {
-      setNotice('Could not load the workspace.');
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!repository) { setNotes([]); setNotesData([]); setTags([]); setSelectedNote(null); return; }
-    loadNotes();
-  }, [repository, loadNotes]);
+  }, [notesData]);
 
   // Recents are per workspace and per machine, so they live in the settings
   // bridge beside `layout` rather than in a file inside the workspace that
@@ -345,8 +349,27 @@ export default function App() {
 
   useEffect(() => {
     if (!window.electronAPI?.onNotesChanged) return;
-    return window.electronAPI.onNotesChanged((_event, path) => {
-      void loadNotes();
+    let cancelled = false;
+    const versions = new Map<string, number>();
+    const unsubscribe = window.electronAPI.onNotesChanged((event, path) => {
+      const version = (versions.get(path) ?? 0) + 1;
+      versions.set(path, version);
+      if (event === 'unlink') {
+        setNotes(current => current.filter(n => n !== path));
+        setNotesData(current => current.filter(n => n.path !== path));
+        setOpenTabs(current => current.filter(n => n !== path));
+        setSelectedNote(current => current === path ? null : current);
+      } else {
+        void window.electronAPI.readNote(path).then(content => {
+          if (cancelled || versions.get(path) !== version || content.startsWith('Error:')) return;
+          setNotes(current => current.includes(path) ? current : [...current, path].sort());
+          if (!path.startsWith('.neuron/')) setNotesData(current => {
+            const existing = current.find(n => n.path === path);
+            if (existing?.content === content) return current;
+            return existing ? current.map(n => n.path === path ? { path, content } : n) : [...current, { path, content }];
+          });
+        }).catch(() => { if (!cancelled) setNotice('Could not update the changed note.'); });
+      }
       if (path !== SHELL_CONFIG) return;
       void window.electronAPI?.readNote(SHELL_CONFIG).then((content) => {
         if (content.startsWith('Error:')) {
@@ -357,7 +380,8 @@ export default function App() {
         setPendingShellConfig(content);
       });
     });
-  }, [loadNotes]);
+    return () => { cancelled = true; unsubscribe(); };
+  }, [repository]);
 
   useEffect(() => {
     let cancelled = false;
@@ -914,6 +938,7 @@ export default function App() {
                               remove chrome, so it hides this too. */}
                           {graphOverlayOpen && !layout.zen && view === 'notes' && (
                             <FloatingGraph
+                              key={repository?.path}
                               notesData={notesData}
                               selectedNote={selectedNote}
                               onSelectNote={handleSelectNote}

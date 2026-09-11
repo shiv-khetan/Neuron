@@ -107,7 +107,35 @@ export const test = base.extend<AppFixture>({
     );
 
     const app = await electron.launch({
-      args: [join(repoRoot, 'dist', 'main', 'main.js'), `--user-data-dir=${userData}`],
+      args: [
+        join(repoRoot, 'dist', 'main', 'main.js'),
+        `--user-data-dir=${userData}`,
+        // Software WebGL, but only where there is no hardware to use.
+        //
+        // The graph renders through Sigma, which needs a WebGL context. CI's
+        // Linux runner has a display (xvfb) but no GPU, and the macOS runner is
+        // no better, so `new Sigma(...)` threw there and the app fell back to
+        // its "WebGL is unavailable" state -- seven graph tests failed on both
+        // while passing on the Windows machine they were written on.
+        //
+        // Not forced on a developer machine, and not on Windows CI either --
+        // that runner already has a working GL path, which is why the graph
+        // tests passed there while both others failed. Turning it on anyway
+        // bought nothing and cost four minutes a run, and the palette race in
+        // T-012 started losing inside the wider window.
+        //
+        // SwiftShader draws the same pixels on a different schedule, so it goes
+        // only where there is no alternative. Supplying a GPU that a runner
+        // lacks is a different thing from changing how the app renders for
+        // everyone who works on it.
+        // `NEURON_SOFTWARE_GL=1` forces it anywhere, which is how the Linux
+        // failure was reproduced and fixed on a Windows desktop in a minute
+        // rather than a ten-minute push and wait.
+        ...(process.env.NEURON_SOFTWARE_GL === '1'
+          || (process.env.CI && process.platform !== 'win32')
+          ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']
+          : []),
+      ],
       cwd: repoRoot,
     });
 
