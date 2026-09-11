@@ -1,7 +1,26 @@
 import { test, expect, openNote } from './fixtures';
+import type { Locator } from '@playwright/test';
 
 // T-026. The graph is a floating square over the editor, on by default, drawing
 // the whole workspace -- not a full-height column showing the active note alone.
+
+/**
+ * Wait until Sigma has actually painted a frame.
+ *
+ * Sigma hit-tests a pointer against what it has DRAWN, not against the graph
+ * model. `data-layout-running="false"` says the physics finished; it says
+ * nothing about the renderer having caught up. On a machine with a GPU the two
+ * are close enough that the difference never shows, but CI has no GPU and runs
+ * on SwiftShader, where the paint lands later -- so a mouse press computed from
+ * `graphToViewport` arrived before the renderer knew where anything was, and
+ * `downNode` never fired. The node was exactly where the test thought; Sigma
+ * had simply not drawn it yet.
+ */
+const painted = (canvas: Locator) => canvas.evaluate((el: any) => new Promise<void>((resolve) => {
+  if (!el.sigma) { resolve(); return; }
+  el.sigma.once('afterRender', () => resolve());
+  el.sigma.refresh();
+}));
 
 test('the graph is visible without touching a shortcut', async ({ page }) => {
   // No keypress, no focus juggling. It is on by default because it replaced a
@@ -160,6 +179,7 @@ test('nodes can be dragged and the layout stops after reheating', async ({ page 
   const canvas = page.locator('[data-graph-canvas]').first();
   await expect.poll(() => canvas.evaluate((el: any) => el.sigma?.getGraph().order ?? 0)).toBeGreaterThan(5);
   await expect(page.locator('[data-graph-root]').first()).toHaveAttribute('data-layout-running', 'false');
+  await painted(canvas);
   const rect = (await canvas.boundingBox())!;
   const target = await canvas.evaluate((el: any) => {
     const s = el.sigma, g = s.getGraph();
@@ -202,6 +222,7 @@ test('clicking a node animates the camera through intermediate positions', async
   const canvas = page.locator('[data-graph-canvas]').first();
   await expect.poll(() => canvas.evaluate((el: any) => el.sigma?.getGraph().order ?? 0)).toBeGreaterThan(5);
   await expect(page.locator('[data-graph-root]').first()).toHaveAttribute('data-layout-running', 'false');
+  await painted(canvas);
   const rect = (await canvas.boundingBox())!;
   const target = await canvas.evaluate((el: any) => {
     const s = el.sigma, g = s.getGraph();

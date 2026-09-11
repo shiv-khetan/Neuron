@@ -107,7 +107,26 @@ export const test = base.extend<AppFixture>({
     );
 
     const app = await electron.launch({
-      args: [join(repoRoot, 'dist', 'main', 'main.js'), `--user-data-dir=${userData}`],
+      args: [
+        join(repoRoot, 'dist', 'main', 'main.js'),
+        `--user-data-dir=${userData}`,
+        // Software WebGL, but only where there is no hardware to use.
+        //
+        // The graph renders through Sigma, which needs a WebGL context. CI's
+        // Linux runner has a display (xvfb) but no GPU, and the macOS runner is
+        // no better, so `new Sigma(...)` threw there and the app fell back to
+        // its "WebGL is unavailable" state -- seven graph tests failed on both
+        // while passing on the Windows machine they were written on.
+        //
+        // Not forced on a developer machine. SwiftShader draws the same pixels
+        // but not on the same schedule, and the two tests that drive a real
+        // pointer at a node -- drag, and the camera animation -- miss their
+        // target under it. Supplying a GPU that CI lacks is a different thing
+        // from changing how the app renders for everyone.
+        ...(process.env.CI
+          ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']
+          : []),
+      ],
       cwd: repoRoot,
     });
 
