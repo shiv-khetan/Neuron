@@ -11,6 +11,7 @@ import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { Badge, Callout, parseSemanticType, MarkdownTable, parseMarkdownTable } from './mdx-components';
 import { Run } from './RunButton';
+import { Flashcard } from './mdx-layout';
 import { buildWikiIndex, resolveWikiLink, type WikiIndex } from '../lib/wikilinks';
 import DocumentProperties from './properties/DocumentProperties';
 import { isFullWidth, parseFrontmatter } from '../lib/frontmatter';
@@ -343,6 +344,15 @@ function buildDecorations(state: EditorState): DecorationSet {
     const title = m.match(/title="([^"]*)"/)?.[1];
     const children = m.match(/>([\s\S]*?)<\/Callout>/)?.[1]?.trim() ?? '';
     return <Callout type={type} title={title}>{children}</Callout>;
+  });
+
+  // A flashcard is only a flashcard if the answer is hidden, so it has to render
+  // as a widget here too. Left as raw text, the editing view would be the one
+  // place the answer is always on show.
+  blockComponent(/<Flashcard\b[^>]*>[\s\S]*?<\/Flashcard>/g, (m) => {
+    const front = m.match(/front="([^"]*)"/)?.[1];
+    const answer = m.match(/>([\s\S]*?)<\/Flashcard>/)?.[1]?.trim() ?? '';
+    return <Flashcard front={front}>{answer}</Flashcard>;
   });
 
   // Inline Badge: replace just the tag span (single line → inline is fine).

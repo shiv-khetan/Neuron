@@ -4,7 +4,7 @@ import { Badge, Callout, parseSemanticType } from './mdx-components';
 import { buildWikiIndex, resolveWikiLink } from '../lib/wikilinks';
 import { Run } from './RunButton';
 import DbView from './DbView';
-import { Row, Col, Grid, Cell, Card, Stat, Divider } from './mdx-layout';
+import { Row, Col, Grid, Cell, Card, Stat, Divider, Flashcard } from './mdx-layout';
 import DocumentProperties from './properties/DocumentProperties';
 import { isFullWidth, parseFrontmatter } from '../lib/frontmatter';
 import { sanitizeHtmlToReact } from '../lib/sanitize-html';
@@ -395,6 +395,9 @@ export default function MDXPreview({ mdxContent, colorScheme = 'dark', onLineCli
         Stat: (a) => <Stat {...a} />,
         Run: (a) => <Run {...a} />,
         Divider: (a) => <Divider {...a} />,
+        // Children are the answer, and they arrive already parsed, so a card
+        // can answer with a list or a code span rather than one flat sentence.
+        Flashcard: (a, k) => <Flashcard {...a}>{k}</Flashcard>,
       };
       const layoutMatch = jsxStr.match(/^<([A-Z][A-Za-z0-9]*)\b/);
       if (layoutMatch && layout[layoutMatch[1]]) {

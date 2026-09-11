@@ -32,6 +32,25 @@ Embed a `.db` database inline by `@path` from the workspace root. It stays live
 
 The embed is read-only; open the `.db` file itself to edit rows and schema.
 
+## Flashcard
+
+A question you answer before you are shown the answer. The prompt is the
+`front` attribute; everything inside is the answer, and it goes through the
+Markdown parser like any other block:
+
+<Flashcard front="Where does a note's full-width setting live, and why there?">
+In the note's own **frontmatter**. It is a property of the file rather than an
+app setting, so it travels with the note into any other editor.
+</Flashcard>
+
+The answer is not in the document until you ask for it, so you cannot read it by
+scrolling past or by searching the page. Cards work the same way in Reading view
+and in the Live editor.
+
+The prompt is plain text — attributes are not parsed as Markdown, so backticks
+and `**` appear literally there. Put anything that needs formatting in the
+answer, which is parsed like any other block.
+
 ## Want more components?
 
 The plugin framework can register additional components — see [[guides/plugins-and-ai]].

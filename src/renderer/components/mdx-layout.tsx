@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { Eye } from 'lucide-react';
 
 /**
  * Layout primitives for MDX notes.
@@ -135,6 +137,50 @@ export function Stat({ label, value, tone }: { label?: string; value?: string; t
       <div className={`text-2xl font-semibold tabular-nums ${ink}`}>{value ?? '—'}</div>
       {label && <div className="mt-0.5 text-[11px] uppercase tracking-wide text-[var(--ink-muted)]">{label}</div>}
     </div>
+  );
+}
+
+/**
+ * A question you answer before you are shown the answer.
+ *
+ * `<Flashcard front="What does a canonical URL declare?">The URL a page should
+ * be indexed under.</Flashcard>`
+ *
+ * The prompt is an attribute and the answer is the children, which is the right
+ * asymmetry rather than an arbitrary one: a prompt is a short line, an answer
+ * wants lists, code and emphasis, and only children go back through the
+ * Markdown parser.
+ *
+ * The answer is not in the DOM until it is asked for. Rendering it hidden would
+ * put it one "find in page" away, and a flashcard whose answer can be read
+ * without revealing it is a paragraph with extra steps.
+ */
+export function Flashcard({ children, front }: { children?: ReactNode; front?: string }) {
+  const [revealed, setRevealed] = useState(false);
+  const prompt = front?.trim() || 'Untitled card';
+
+  return (
+    <section className="my-4 rounded-lg border border-[var(--divider)] bg-[var(--surface)] p-4">
+      <p className="text-sm font-medium leading-6 text-[var(--ink)]">{prompt}</p>
+
+      {revealed ? (
+        <div className="mt-3 border-t border-[var(--divider)] pt-3 text-sm leading-6 text-[var(--ink-secondary)]">
+          {children ?? <span className="text-[var(--ink-muted)]">This card has no answer yet.</span>}
+        </div>
+      ) : (
+        <button
+          type="button"
+          // Not a toggle. Once you have seen the answer, hiding it again only
+          // helps if you have forgotten it, and by then the card has been
+          // re-rendered anyway -- a second press that undoes the first is a
+          // control that punishes a misclick.
+          onClick={() => setRevealed(true)}
+          className="interactive mt-3 flex min-h-[var(--control-sm)] items-center gap-1.5 rounded-md border border-[var(--divider)] px-2.5 text-xs font-medium text-[var(--ink-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--ink)]"
+        >
+          <Eye className="h-3.5 w-3.5" /> Show answer
+        </button>
+      )}
+    </section>
   );
 }
 
